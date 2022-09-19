@@ -28,12 +28,14 @@
  * -------------------------------------------------------------------------
  */
 
-define ('PLUGIN_TAG_VERSION', '2.8.3');
+use Glpi\Plugin\Hooks;
+
+define ('PLUGIN_TAG_VERSION', '2.10.0');
 
 // Minimal GLPI version, inclusive
-define("PLUGIN_TAG_MIN_GLPI", "9.5");
+define("PLUGIN_TAG_MIN_GLPI", "10.0.0");
 // Maximum GLPI version, exclusive
-define("PLUGIN_TAG_MAX_GLPI", "9.6");
+define("PLUGIN_TAG_MAX_GLPI", "10.0.99");
 
 /**
  * Init hooks of the plugin.
@@ -46,8 +48,7 @@ function plugin_init_tag() {
 
    $PLUGIN_HOOKS['csrf_compliant']['tag'] = true;
 
-   $plugin = new Plugin();
-   if ($plugin->isInstalled("tag") && $plugin->isActivated("tag")) {
+   if (Plugin::isPluginActive("tag")) {
 
       // define list of itemtype which can be associated with tags
       $CFG_GLPI['plugin_tag_itemtypes'] = [
@@ -63,17 +64,17 @@ function plugin_init_tag() {
          __('Setup')          => ['SLA', 'SlaLevel', 'Link'],
       ];
 
-      if ($plugin->isInstalled('appliances') && $plugin->isActivated('appliances')) {
+      if (Plugin::isPluginActive('appliances')) {
          $CFG_GLPI['plugin_tag_itemtypes'][__('Assets')][] = 'PluginAppliancesAppliance';
       }
 
       // Plugin Webapplication
-      if ($plugin->isInstalled('webapplications') && $plugin->isActivated('webapplications')) {
+      if (Plugin::isPluginActive('webapplications')) {
          $CFG_GLPI['plugin_tag_itemtypes'][__('Assets')][] = 'PluginWebapplicationsWebapplication';
       }
 
       // Plugin fusioninventory
-      if ($plugin->isInstalled('fusioninventory') && $plugin->isActivated('fusioninventory')) {
+      if (Plugin::isPluginActive('fusioninventory')) {
          $CFG_GLPI['plugin_tag_itemtypes'][__('FusionInventory')][] = 'PluginFusioninventoryTask';
       }
 
@@ -87,7 +88,7 @@ function plugin_init_tag() {
       $PLUGIN_HOOKS['use_massive_action']['tag'] = true;
 
       // Plugin uninstall : after uninstall action
-      if ($plugin->isInstalled("uninstall") && $plugin->isActivated("uninstall")) {
+      if (Plugin::isPluginActive("uninstall")) {
          //to prevent null global variable load plugin if needed
          if ($UNINSTALL_TYPES == null) {
             Plugin::load('uninstall');
@@ -105,12 +106,30 @@ function plugin_init_tag() {
          $PLUGIN_HOOKS['pre_item_form']['tag'] = ['PluginTagTag', 'showForItem'];
       }
       $PLUGIN_HOOKS['pre_kanban_content']['tag'] = ['PluginTagTag', 'preKanbanContent'];
+      $common_kanban_filters = [
+         'tag' => [
+            'description' => _x('filters', 'If the item has a tag', 'tag'),
+            'supported_prefixes' => ['!']
+         ],
+         'tagged' => [
+            'description' => _x('filters', 'If the item is tagged', 'tag'),
+            'supported_prefixes' => ['!']
+         ]
+      ];
+      $PLUGIN_HOOKS[Hooks::KANBAN_FILTERS]['tag'] = [
+         'Project' => $common_kanban_filters,
+         'Ticket' => $common_kanban_filters,
+         'Problem' => $common_kanban_filters,
+         'Change' => $common_kanban_filters,
+      ];
+      $PLUGIN_HOOKS[Hooks::KANBAN_ITEM_METADATA]['tag'] = ['PluginTagTag', 'kanbanItemMetadata'];
 
       // plugin datainjection
       $PLUGIN_HOOKS['plugin_datainjection_populate']['tag'] = "plugin_datainjection_populate_tag";
 
       // add needed javascript & css files
       $PLUGIN_HOOKS['add_javascript']['tag'][] = 'js/common.js';
+      $PLUGIN_HOOKS['add_javascript']['tag'][] = 'js/kanban.js';
       $PLUGIN_HOOKS['add_css']['tag'][]        = 'css/tag.css';
       if (Session::isMultiEntitiesMode()) {
          $PLUGIN_HOOKS['add_javascript']['tag'][] = 'js/entity.js';
