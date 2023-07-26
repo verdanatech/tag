@@ -30,7 +30,7 @@
 
 use Glpi\Plugin\Hooks;
 
-define ('PLUGIN_TAG_VERSION', '2.11.2');
+define ('PLUGIN_TAG_VERSION', '2.11.5');
 
 // Minimal GLPI version, inclusive
 define("PLUGIN_TAG_MIN_GLPI", "10.0.0");
@@ -63,6 +63,10 @@ function plugin_init_tag() {
          __('Administration') => ['User', 'Group', 'Entity', 'Profile'],
          __('Setup')          => ['SLA', 'SlaLevel', 'Link'],
       ];
+
+      if (class_exists('Webhook')) {
+         $CFG_GLPI['plugin_tag_itemtypes'][__('Setup')][] = 'Webhook';
+      }
 
       if (Plugin::isPluginActive('appliances')) {
          $CFG_GLPI['plugin_tag_itemtypes'][__('Assets')][] = 'PluginAppliancesAppliance';
