@@ -59,7 +59,7 @@ function plugin_tag_getAddSearchOptionsNew($itemtype)
             'field'         => 'name',
             'name'          => PluginTagTag::getTypeName(2),
             'datatype'      => 'dropdown',
-            'searchtype'    => ['equals','notequals','contains'],
+            'searchtype'    => ['equals', 'notequals', 'contains'],
             'massiveaction' => false,
             'forcegroupby'  => true,
             'joinparams'    =>  [
@@ -76,7 +76,7 @@ function plugin_tag_getAddSearchOptionsNew($itemtype)
     if ($itemtype != 'AllAssets') {
         $item = new $itemtype();
         if ($item->isEntityAssign()) {
-            $options [] = [
+            $options[] = [
                 'id'            => (PluginTagTag::S_OPTION + 1),
                 'table'         => PluginTagTag::getTable(),
                 'field'         => 'name',
@@ -117,7 +117,7 @@ function plugin_tag_giveItem($type, $field, $data, $num, $linkfield = "")
             foreach ($data[$num] as $tag) {
                 if (isset($tag['id']) && isset($tag['name'])) {
                     $out .= PluginTagTag::getSingleTag($tag['id'], $separator);
-                   //For export (CSV, PDF) of GLPI core
+                    //For export (CSV, PDF) of GLPI core
                     $separator = '<span style="display:none">, </span>';
                 }
             }
@@ -188,9 +188,9 @@ function plugin_tag_MassiveActions($itemtype = '')
     if (PluginTagTag::canItemtype($itemtype) && is_a($itemtype, CommonDBTM::class, true) && $itemtype::canUpdate()) {
         return [
             'PluginTagTagItem' . MassiveAction::CLASS_ACTION_SEPARATOR . 'addTag'
-               => __("Add tags", 'tag'),
+            => __("Add tags", 'tag'),
             'PluginTagTagItem' . MassiveAction::CLASS_ACTION_SEPARATOR . 'removeTag'
-               => __("Remove tags", 'tag'),
+            => __("Remove tags", 'tag'),
         ];
     }
 
@@ -284,7 +284,7 @@ function plugin_tag_getRuleActions($params = [])
 
     switch ($params['rule_itemtype']) {
         case "RuleTicket":
-            $actions['_plugin_tag_tag_values'] = [
+            $actions['_plugin_tag_tag_from_rules'] = [
                 'name'  => __("Add tags", 'tag'),
                 'type'  => 'dropdown',
                 'table' => PluginTagTag::getTable(),
