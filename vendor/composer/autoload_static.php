@@ -4,8 +4,22 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit69a8ef6f1fc0791f38cf7219bcf398e3
+class ComposerStaticInit24e519c9388f15003effa15cb3834ea2
 {
+    public static $prefixLengthsPsr4 = array (
+        'G' => 
+        array (
+            'GlpiPlugin\\Tag\\Tests\\' => 21,
+        ),
+    );
+
+    public static $prefixDirsPsr4 = array (
+        'GlpiPlugin\\Tag\\Tests\\' => 
+        array (
+            0 => __DIR__ . '/../..' . '/tests',
+        ),
+    );
+
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
     );
@@ -13,7 +27,9 @@ class ComposerStaticInit69a8ef6f1fc0791f38cf7219bcf398e3
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->classMap = ComposerStaticInit69a8ef6f1fc0791f38cf7219bcf398e3::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit24e519c9388f15003effa15cb3834ea2::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit24e519c9388f15003effa15cb3834ea2::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInit24e519c9388f15003effa15cb3834ea2::$classMap;
 
         }, null, ClassLoader::class);
     }

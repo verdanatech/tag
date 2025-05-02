@@ -340,8 +340,7 @@ SQL;
                         $pieces = preg_split('/(?=[A-Z])/', $itemtype);
                         $plugin_name = $pieces[2];
 
-                        $datas = [
-                            "entities_id" => $data["entity"],
+                        $datas = ["entities_id" => $data["entity"],
                             "ITEM_0"      => $data["name"],
                             "ITEM_0_2"    => $data["id"],
                             "id"          => $data["id"],
@@ -444,7 +443,8 @@ SQL;
 
         // Be careful to not check right if the change is coming from the cron
         if (
-            (!Session::isCron() && !$tag::canUpdate())
+            !Session::isCron()
+            && !$tag::canUpdate()
             && !isset($item->input["_plugin_tag_tag_from_rules"])
         ) {
             return true;
@@ -452,11 +452,11 @@ SQL;
 
         // create new values
         $tag_values = !empty($item->input["_plugin_tag_tag_values"])
-            ? $item->input["_plugin_tag_tag_values"]
-            : [];
+         ? $item->input["_plugin_tag_tag_values"]
+         : [];
         $tag_from_rules = !empty($item->input["_plugin_tag_tag_from_rules"])
-            ? [$item->input["_plugin_tag_tag_from_rules"]]
-            : [];
+         ? [$item->input["_plugin_tag_tag_from_rules"]]
+         : [];
         $tag_values = array_merge($tag_values, $tag_from_rules);
         if (!is_array($tag_values)) {
             // Business rule engine will add value as a unique string that must be converted to array.
@@ -523,7 +523,7 @@ SQL;
         switch ($ma->getAction()) {
             case 'addTag':
             case 'removeTag':
-                PluginTagTag::showTagDropdown(['itemtype' => $itemtype]);
+                PluginTagTag::showTagDropdown(['itemtype' => $itemtype, 'items_ids' => array_keys($ma->items[$itemtype])]);
                 echo Html::submit(_sx('button', 'Save'));
                 return true;
         }

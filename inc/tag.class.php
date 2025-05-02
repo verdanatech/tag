@@ -75,7 +75,23 @@ class PluginTagTag extends CommonDropdown
      */
     public static function canItemtype($itemtype = '')
     {
-        return !empty($itemtype) && class_exists($itemtype) && !in_array($itemtype, self::getBlacklistItemtype());
+        if (empty($itemtype) || !class_exists($itemtype) || in_array($itemtype, self::getBlacklistItemtype())) {
+            return false;
+        }
+
+        $tags = new self();
+        $types_menu = [];
+        $use_global_tag = false;
+
+        foreach ($tags->find(['is_active' => 1]) as $tag) {
+            if (!empty($tag['type_menu'])) {
+                $types_menu = array_merge($types_menu, json_decode($tag['type_menu']));
+            } else {
+                $use_global_tag = true;
+            }
+        }
+
+        return $use_global_tag || in_array($itemtype, $types_menu);
     }
 
     public function showForm($ID, $options = [])
@@ -600,6 +616,7 @@ SQL;
             'id'       => 0,
             'itemtype' => '',
             'value'    => '',
+            'items_ids' => [],
         ];
         $params = array_merge($default_params, $params);
 
@@ -701,10 +718,16 @@ SQL;
             $token_creation = "return null;";
         }
 
+        // Returns false if at least one item in "items_ids" cannot be updated
+        $can_update_all = count(array_filter($params['items_ids'], function ($value) use ($obj) {
+            $obj->getFromDB($value);
+            return !$obj->canUpdateItem();
+        })) === 0;
+
         $readOnly = !$tag::canUpdate()
             || ($obj->isNewItem() && !$obj->canCreateItem())
             || (!$obj->isNewItem() && !$obj->canUpdateItem())
-        ;
+            || (!empty($params['items_ids']) && !$can_update_all);
 
        // call select2 lib for this input
         echo Html::scriptBlock("

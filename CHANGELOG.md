@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [UNRELEASED]
+
+## [2.12.2] - 2025-02-19
+
+### Fixed
+
+- Apply `tag`  based on rules in all cases (for example: the user is self-service)
+- Preventing the addition of tags to objects without creation rights
+- See tag only on active itemtypes
+
 ## [2.12.1] - 2024-10-24
 
 ### Fixed
