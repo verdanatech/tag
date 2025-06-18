@@ -35,7 +35,7 @@ class PluginTagTag extends CommonDropdown
     // From CommonDBTM
     public $dohistory = true;
 
-    const S_OPTION = 10500;
+    public const S_OPTION = 10500;
     public static $rightname = 'plugin_tag_tag';
 
     public static function getTypeName($nb = 1)
@@ -156,12 +156,7 @@ class PluginTagTag extends CommonDropdown
                     KEY `is_active` (`is_active`)
                 ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;
 SQL;
-            if (method_exists($DB, 'doQueryOrDie')) {
-                $DB->doQueryOrDie($query);
-            } else {
-                /** @phpstan-ignore-next-line */
-                $DB->queryOrDie($query);
-            }
+            $DB->doQueryOrDie($query);
         } else {
             if (!$DB->fieldExists($table, 'type_menu')) {
                 $migration->addField($table, 'type_menu', "text");
@@ -217,20 +212,20 @@ SQL;
         $DB->deleteOrDie('glpi_logs', [
             'OR' => [
                 'itemtype_link' => __CLASS__,
-                'itemtype'      => __CLASS__
-            ]
+                'itemtype'      => __CLASS__,
+            ],
         ]);
         $DB->deleteOrDie('glpi_savedsearches', [
-            'itemtype'      => __CLASS__
+            'itemtype'      => __CLASS__,
         ]);
         $DB->deleteOrDie('glpi_savedsearches_users', [
-            'itemtype'      => __CLASS__
+            'itemtype'      => __CLASS__,
         ]);
         $DB->deleteOrDie('glpi_displaypreferences', [
             'OR' => [
                 'itemtype'      => __CLASS__,
-                'num'           => self::S_OPTION
-            ]
+                'num'           => self::S_OPTION,
+            ],
         ]);
 
         $migration = new Migration(PLUGIN_TAG_VERSION);
@@ -248,14 +243,13 @@ SQL;
 
     public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0)
     {
-        switch ($item->getType()) {
-            case __CLASS__:
-                switch ($tabnum) {
-                    case 2:
-                        $tagitem = new PluginTagTagItem();
-                        $tagitem->showForTag($item);
-                        break;
-                }
+        if ($item instanceof self) {
+            switch ($tabnum) {
+                case 2:
+                    $tagitem = new PluginTagTagItem();
+                    $tagitem->showForTag($item);
+                    break;
+            }
         }
         return true;
     }
@@ -274,7 +268,7 @@ SQL;
     {
         $tagitem = new PluginTagTagItem();
         $tagitem->deleteByCriteria([
-            'plugin_tag_tags_id' => $this->getID()
+            'plugin_tag_tags_id' => $this->getID(),
         ]);
     }
 
@@ -409,10 +403,9 @@ SQL;
                     $name,
                     $elements,
                     ['display' => false,
-                        'value'   => $values[$field]
-                    ]
+                        'value'   => $values[$field],
+                    ],
                 );
-             break;
         }
 
         return parent::getSpecificValueToSelect($field, $name, $values, $options);
@@ -513,7 +506,7 @@ SQL;
      *                          - itemtype The item type
      *                          - items_id The item's id
      *                          - content postKanbanContent content
-     * @return array Array of params passed in in addition to the new content.
+     * @return array|null Array of params passed in in addition to the new content.
      */
     public static function preKanbanContent($params = [])
     {
@@ -532,21 +525,21 @@ SQL;
                 'SELECT'    => [
                     'name',
                     'comment',
-                    'color'
+                    'color',
                 ],
                 'FROM'      => PluginTagTagItem::getTable(),
                 'LEFT JOIN' => [
                     PluginTagTag::getTable() => [
                         'FKEY'   => [
                             PluginTagTag::getTable()      => 'id',
-                            PluginTagTagItem::getTable()  => 'plugin_tag_tags_id'
-                        ]
-                    ]
+                            PluginTagTagItem::getTable()  => 'plugin_tag_tags_id',
+                        ],
+                    ],
                 ],
                 'WHERE'     => [
                     'itemtype'  => $params['itemtype'],
-                    'items_id'  => $params['items_id']
-                ]
+                    'items_id'  => $params['items_id'],
+                ],
             ]);
 
             $content = "<div style='display: flex; flex-wrap: wrap;'>";
@@ -584,14 +577,14 @@ SQL;
                     PluginTagTag::getTable() => [
                         'FKEY'   => [
                             PluginTagTag::getTable()      => 'id',
-                            PluginTagTagItem::getTable()  => 'plugin_tag_tags_id'
-                        ]
-                    ]
+                            PluginTagTagItem::getTable()  => 'plugin_tag_tags_id',
+                        ],
+                    ],
                 ],
                 'WHERE'     => [
                     'itemtype'  => $params['itemtype'],
-                    'items_id'  => $params['items_id']
-                ]
+                    'items_id'  => $params['items_id'],
+                ],
             ]);
 
             $params['metadata']['tags'] = $params['metadata']['tags'] ?? [];
@@ -646,7 +639,7 @@ SQL;
         if (!$obj->isNewItem()) {
             foreach (
                 $tag_item->find(['items_id' => $params['id'],
-                    'itemtype' => $itemtype
+                    'itemtype' => $itemtype,
                 ]) as $found_item
             ) {
                 $values[] = $found_item['plugin_tag_tags_id'];
@@ -665,7 +658,7 @@ SQL;
                 ['type_menu' => ''],
                 ['type_menu' => 0],
                 ['type_menu' => ['LIKE', '%"' . $itemtype . '"%']],
-            ]
+            ],
         ];
         if ($obj->isEntityAssign()) {
             $where += getEntitiesRestrictCriteria('', '', '', true);
@@ -709,7 +702,7 @@ SQL;
                 'id'       => "tag_select_$rand",
                 'class'    => 'tag_select',
                 'multiple' => 'multiple',
-            ]
+            ],
         );
 
         // prefix value by 'newtag_' to differenciate created tag from existing ones
@@ -729,7 +722,7 @@ SQL;
             || (!$obj->isNewItem() && !$obj->canUpdateItem())
             || (!empty($params['items_ids']) && !$can_update_all);
 
-       // call select2 lib for this input
+        // call select2 lib for this input
         echo Html::scriptBlock("
             $(function() {
                 $('#tag_select_$rand').select2({
@@ -758,7 +751,7 @@ SQL;
             echo "<div class='btn btn-outline-secondary'>";
             echo Html::showToolTip(
                 __("View all tags", 'tag'),
-                ['link' => self::getSearchURL()]
+                ['link' => self::getSearchURL()],
             );
             echo "</div>";
         }
@@ -771,8 +764,8 @@ SQL;
                 [
                     'name' => 'save_tag',
                     'id' => 'save_tag',
-                    'class' => 'btn btn-outline-primary'
-                ]
+                    'class' => 'btn btn-outline-primary',
+                ],
             );
 
             $url = Plugin::getWebDir('tag', true) . '/ajax/tag.php';
@@ -853,7 +846,7 @@ SQL;
     /**
      * Encode sub types
      *
-     * @param type $input
+     * @param array $input
      */
     public function encodeSubtypes($input)
     {
@@ -895,7 +888,7 @@ SQL;
     /**
      * Retrieve the current itemtype from the current page url
      *
-     * @return mixed(string/boolean) false if not itemtype found, the string itemtype if found
+     * @return string|boolean false if not itemtype found, the string itemtype if found
      */
     public static function getCurrentItemtype()
     {
@@ -905,25 +898,25 @@ SQL;
             && array_key_exists('itemtype', $_GET)
         ) {
             $itemtype = $_GET['itemtype'];
-        } else if (
+        } elseif (
             preg_match(
                 '/\/(?:marketplace|plugins)\/([a-zA-Z]+)\/front\/([a-zA-Z]+).form.php/',
                 $_SERVER['PHP_SELF'],
-                $matches
+                $matches,
             )
         ) {
             $itemtype = 'Plugin' . ucfirst($matches[1]) . ucfirst($matches[2]);
-        } else if (preg_match('/([a-zA-Z]+).form.php/', $_SERVER['PHP_SELF'], $matches)) {
+        } elseif (preg_match('/([a-zA-Z]+).form.php/', $_SERVER['PHP_SELF'], $matches)) {
             $itemtype = $matches[1];
-        } else if (
+        } elseif (
             preg_match(
                 '/\/(?:marketplace|plugins)\/([a-zA-Z]+)\/front\/([a-zA-Z]+).php/',
                 $_SERVER['PHP_SELF'],
-                $matches
+                $matches,
             )
         ) {
             $itemtype = 'Plugin' . ucfirst($matches[1]) . ucfirst($matches[2]);
-        } else if (preg_match('/([a-zA-Z]+).php/', $_SERVER['PHP_SELF'], $matches)) {
+        } elseif (preg_match('/([a-zA-Z]+).php/', $_SERVER['PHP_SELF'], $matches)) {
             $itemtype = $matches[1];
         }
 

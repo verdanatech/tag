@@ -34,7 +34,7 @@ function plugin_uninstall_after_tag($item)
     $tagitem = new PluginTagTagItem();
     $tagitem->deleteByCriteria([
         'itemtype' => $item->getType(),
-        'items_id' => $item->getID()
+        'items_id' => $item->getID(),
     ]);
 }
 
@@ -52,26 +52,34 @@ function plugin_tag_getAddSearchOptionsNew($itemtype)
         return [];
     }
 
-    $options = [
-        [
-            'id'            => PluginTagTag::S_OPTION,
-            'table'         => PluginTagTag::getTable(),
-            'field'         => 'name',
-            'name'          => PluginTagTag::getTypeName(2),
-            'datatype'      => 'dropdown',
-            'searchtype'    => ['equals','notequals','contains'],
-            'massiveaction' => false,
-            'forcegroupby'  => true,
-            'joinparams'    =>  [
-                'beforejoin' => [
-                    'table'      => 'glpi_plugin_tag_tagitems',
-                    'joinparams' => [
-                        'jointype' => 'itemtype_item'
-                    ]
-                ]
-            ]
-        ]
+    $glpiVersion = new Plugin();
+    $glpiVersion = $glpiVersion->getGlpiVersion();
+
+    $so_param = [
+        'id'            => PluginTagTag::S_OPTION,
+        'table'         => PluginTagTag::getTable(),
+        'field'         => 'name',
+        'name'          => PluginTagTag::getTypeName(2),
+        'datatype'      => 'dropdown',
+        'searchtype'    => ['equals','notequals','contains'],
+        'massiveaction' => false,
+        'forcegroupby'  => true,
+        'joinparams'    =>  [
+            'beforejoin' => [
+                'table'      => 'glpi_plugin_tag_tagitems',
+                'joinparams' => [
+                    'jointype' => 'itemtype_item',
+                ],
+            ],
+        ],
     ];
+
+    if (version_compare($glpiVersion, "10.0.19", '>=')) {
+        $so_param['use_subquery'] = true;
+        $so_param['joinparams']['beforejoin']['joinparams']['field'] = 'items_id';
+    }
+
+    $options[] = $so_param;
 
     if ($itemtype != 'AllAssets') {
         $item = new $itemtype();
@@ -95,10 +103,10 @@ function plugin_tag_getAddSearchOptionsNew($itemtype)
                             'specific_itemtype' => 'Entity',
                             'beforejoin' => [
                                 'table' => 'glpi_entities',
-                            ]
-                        ]
-                    ]
-                ]
+                            ],
+                        ],
+                    ],
+                ],
             ];
         }
     }
@@ -117,7 +125,7 @@ function plugin_tag_giveItem($type, $field, $data, $num, $linkfield = "")
             foreach ($data[$num] as $tag) {
                 if (isset($tag['id']) && isset($tag['name'])) {
                     $out .= PluginTagTag::getSingleTag($tag['id'], $separator);
-                   //For export (CSV, PDF) of GLPI core
+                    //For export (CSV, PDF) of GLPI core
                     $separator = '<span style="display:none">, </span>';
                 }
             }
@@ -265,7 +273,8 @@ function plugin_tag_post_init()
     if ($itemtype = PluginTagTag::getCurrentItemtype()) {
         if (PluginTagTag::canItemtype($itemtype)) {
             $PLUGIN_HOOKS['item_add']['tag'][$itemtype]        = ['PluginTagTagItem', 'updateItem'];
-            $PLUGIN_HOOKS['pre_item_update']['tag'][$itemtype] = ['PluginTagTagItem', 'updateItem'];
+            $PLUGIN_HOOKS['item_update']['tag'][$itemtype]     = ['PluginTagTagItem', 'updateItem'];
+            $PLUGIN_HOOKS['pre_item_update']['tag'][$itemtype]     = ['PluginTagTagItem', 'updateItem'];
             $PLUGIN_HOOKS['pre_item_purge']['tag'][$itemtype]  = ['PluginTagTagItem', 'purgeItem'];
         }
     }
@@ -274,8 +283,31 @@ function plugin_tag_post_init()
     // Needed for rules to function properly when a ticket is created from a mail
     // collector
     $PLUGIN_HOOKS['item_add']['tag'][Ticket::getType()]        = ['PluginTagTagItem', 'updateItem'];
-    $PLUGIN_HOOKS['pre_item_update']['tag'][Ticket::getType()] = ['PluginTagTagItem', 'updateItem'];
+    $PLUGIN_HOOKS['item_update']['tag'][Ticket::getType()]     = ['PluginTagTagItem', 'updateItem'];
+    $PLUGIN_HOOKS['pre_item_update']['tag'][Ticket::getType()]     = ['PluginTagTagItem', 'updateItem'];
     $PLUGIN_HOOKS['pre_item_purge']['tag'][Ticket::getType()]  = ['PluginTagTagItem', 'purgeItem'];
+
+    $PLUGIN_HOOKS['rule_matched']['tag'] = 'plugin_tag_rule_matched';
+}
+
+function plugin_tag_rule_matched($params = [])
+{
+    // Ensure tags are added when only actors are updated, as actor updates are processed in post_add
+    if (
+        $params['sub_type'] == \RuleTicket::class
+        && !empty($params['output'])
+        && isset($params['output']['id'])
+        && (
+            isset($params['output']["_plugin_tag_tag_from_rules"])
+            || isset($params['output']["_additional_tags_from_rules"])
+        )
+    ) {
+        $ticket = new Ticket();
+        if ($ticket->getFromDB($params['output']['id'])) {
+            $ticket->input = array_merge($ticket->input, $params['output']);
+            PluginTagTagItem::updateItem($ticket);
+        }
+    }
 }
 
 function plugin_tag_getRuleActions($params = [])
@@ -288,6 +320,8 @@ function plugin_tag_getRuleActions($params = [])
                 'name'  => __("Add tags", 'tag'),
                 'type'  => 'dropdown',
                 'table' => PluginTagTag::getTable(),
+                'force_actions' => ['assign', 'append'],
+                'appendto' => '_additional_tags_from_rules',
                 'condition' => ['type_menu' => ['LIKE', '%\"Ticket\"%']],
             ];
 

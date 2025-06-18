@@ -37,8 +37,10 @@ class PluginTagProfile extends Profile
 
     public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0)
     {
-        $tagprofile = new self();
-        $tagprofile->showForm($item->getID());
+        if ($item instanceof CommonDBTM) {
+            $tagprofile = new self();
+            $tagprofile->showForm($item->getID());
+        }
         return true;
     }
 
@@ -59,8 +61,8 @@ class PluginTagProfile extends Profile
             [
                 'itemtype'  => 'PluginTagTag',
                 'label'     => PluginTagTag::getTypeName(Session::getPluralNumber()),
-                'field'     => 'plugin_tag_tag'
-            ]
+                'field'     => 'plugin_tag_tag',
+            ],
         ];
         $matrix_options['title'] = __('Tag management', 'tag');
         $profile->displayRightsChoiceMatrix($rights, $matrix_options);
