@@ -40,17 +40,20 @@ $(function() {
 });
 
 var setEntityTag = function() {
-    $('.entity-name, .entity-badge, .glpi-badge').each(
+    $('.entity-name, .glpi-badge').each(
         function() {
             var entity_element = $(this);
             var entity_name = entity_element.attr('title');
             if (entity_element.hasClass('tags_already_set')) {
                 return; // consider this return as a continue in a jquery each
             }
+            if (!entity_name) {
+                return;
+            }
             entity_element.addClass('tags_already_set');
     
             $.ajax({
-                url: CFG_GLPI.root_doc + '/' + GLPI_PLUGINS_PATH.tag + '/ajax/get_entity_tags.php',
+                url: CFG_GLPI.root_doc + '/plugins/tag/ajax/get_entity_tags.php',
                 data: {
                     'name': entity_name,
                 },

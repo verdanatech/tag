@@ -28,14 +28,22 @@
  * -------------------------------------------------------------------------
  */
 
+use Glpi\Application\ImportMapGenerator;
+use Glpi\Form\Destination\AbstractCommonITILFormDestination;
+use Glpi\Form\Destination\FormDestinationManager;
+use Glpi\Form\Form;
+use Glpi\Form\Migration\TypesConversionMapper;
+use Glpi\Form\QuestionType\QuestionTypesManager;
 use Glpi\Plugin\Hooks;
 
-define('PLUGIN_TAG_VERSION', '2.12.5');
+use function Safe\define;
+
+define('PLUGIN_TAG_VERSION', '2.14.2');
 
 // Minimal GLPI version, inclusive
-define("PLUGIN_TAG_MIN_GLPI", "10.0.11");
+define("PLUGIN_TAG_MIN_GLPI", "11.0.1");
 // Maximum GLPI version, exclusive
-define("PLUGIN_TAG_MAX_GLPI", "10.0.99");
+define("PLUGIN_TAG_MAX_GLPI", "11.0.99");
 
 /**
  * Init hooks of the plugin.
@@ -57,40 +65,40 @@ function plugin_init_tag()
     if (Plugin::isPluginActive("tag")) {
         // define list of itemtype which can be associated with tags
         $CFG_GLPI['plugin_tag_itemtypes'] = [
-            __('Assets')         => [
+            __s('Assets')         => [
                 'Computer', 'Monitor', 'Software', 'NetworkEquipment',
                 'Peripheral', 'Printer', 'CartridgeItem', 'ConsumableItem',
                 'Phone', 'Enclosure', 'PDU', 'PassiveDCEquipment',
             ],
-            __('Assistance')     => [
+            __s('Assistance')     => [
                 'Ticket', 'Problem', 'Change', 'TicketRecurrent',
-                'TicketTemplate',
+                'TicketTemplate', 'PlanningExternalEvent',
             ],
-            __('Management')     => [
+            __s('Management')     => [
                 'Budget', 'Supplier', 'Contact', 'Contract', 'Document',
                 'Line', 'Certificate', 'Appliance', 'Cluster', 'Domain',
             ],
-            __('Tools')          => ['Project', 'Reminder', 'RSSFeed', 'KnowbaseItem', 'ProjectTask'],
-            __('Administration') => ['User', 'Group', 'Entity', 'Profile'],
-            __('Setup')          => ['SLA', 'SlaLevel', 'Link'],
+            __s('Tools')          => ['Project', 'Reminder', 'RSSFeed', 'KnowbaseItem', 'ProjectTask'],
+            __s('Administration') => ['User', 'Group', 'Entity', 'Profile', Form::class],
+            __s('Setup')          => ['SLA', 'SlaLevel', 'Link'],
         ];
 
         if (class_exists('Webhook')) {
-            $CFG_GLPI['plugin_tag_itemtypes'][__('Setup')][] = 'Webhook';
+            $CFG_GLPI['plugin_tag_itemtypes'][__s('Setup')][] = 'Webhook';
         }
 
         if (Plugin::isPluginActive('appliances')) {
-            $CFG_GLPI['plugin_tag_itemtypes'][__('Assets')][] = 'PluginAppliancesAppliance';
+            $CFG_GLPI['plugin_tag_itemtypes'][__s('Assets')][] = 'PluginAppliancesAppliance';
         }
 
         // Plugin Webapplication
         if (Plugin::isPluginActive('webapplications')) {
-            $CFG_GLPI['plugin_tag_itemtypes'][__('Assets')][] = 'PluginWebapplicationsWebapplication';
+            $CFG_GLPI['plugin_tag_itemtypes'][__s('Assets')][] = 'PluginWebapplicationsWebapplication';
         }
 
         // Plugin fusioninventory
         if (Plugin::isPluginActive('fusioninventory')) {
-            $CFG_GLPI['plugin_tag_itemtypes'][__('FusionInventory')][] = 'PluginFusioninventoryTask';
+            $CFG_GLPI['plugin_tag_itemtypes'][__s('FusionInventory')][] = 'PluginFusioninventoryTask';
         }
 
         // add link on plugin name in Configuration > Plugin
@@ -108,6 +116,7 @@ function plugin_init_tag()
             if ($UNINSTALL_TYPES == null) {
                 Plugin::load('uninstall');
             }
+
             foreach ($UNINSTALL_TYPES as $u_itemtype) {
                 $PLUGIN_HOOKS['plugin_uninstall_after']['tag'][$u_itemtype] = 'plugin_uninstall_after_tag';
             }
@@ -120,6 +129,7 @@ function plugin_init_tag()
         } else {
             $PLUGIN_HOOKS['pre_item_form']['tag'] = ['PluginTagTag', 'showForItem'];
         }
+
         $PLUGIN_HOOKS['pre_kanban_content']['tag'] = ['PluginTagTag', 'preKanbanContent'];
         $common_kanban_filters = [
             'tag' => [
@@ -143,17 +153,22 @@ function plugin_init_tag()
         $PLUGIN_HOOKS['plugin_datainjection_populate']['tag'] = "plugin_datainjection_populate_tag";
 
         // add needed javascript & css files
-        $PLUGIN_HOOKS['add_javascript']['tag'][] = 'js/common.js';
-        $PLUGIN_HOOKS['add_javascript']['tag'][] = 'js/kanban.js';
-        $PLUGIN_HOOKS['add_css']['tag'][]        = 'css/tag.css';
+        $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['tag'][] = 'js/common.js';
+        $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['tag'][] = 'js/kanban.js';
+        $PLUGIN_HOOKS[Hooks::ADD_CSS]['tag'][]        = 'css/tag.css';
         if (Session::isMultiEntitiesMode()) {
-            $PLUGIN_HOOKS['add_javascript']['tag'][] = 'js/entity.js';
+            $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['tag'][] = 'js/entity.js';
         }
+
+        ImportMapGenerator::getInstance()->registerModulesPath('tag', '/public/js/modules');
 
         Plugin::registerClass('PluginTagProfile', ['addtabon' => ['Profile']]);
         Plugin::registerClass('PluginTagConfig', ['addtabon' => 'Config']);
 
         $PLUGIN_HOOKS['use_rules']['tag']      = ['RuleTicket'];
+
+        // Register tag question type
+        plugin_tag_register_plugin_types();
     }
 }
 
@@ -166,11 +181,11 @@ function plugin_init_tag()
 function plugin_version_tag()
 {
     return [
-        'name'       => __('Tag Management', 'tag'),
+        'name'       => __s('Tag Management', 'tag'),
         'version'        => PLUGIN_TAG_VERSION,
         'author'         => '<a href="http://www.teclib.com">Teclib\'</a> - Infotel conseil',
         'homepage'       => 'https://github.com/pluginsGLPI/tag',
-        'license'        => '<a href="' . Plugin::getWebDir('tag') . '/LICENSE" target="_blank">GPLv2+</a>',
+        'license'        => '<a href="' . plugin_tag_geturl() . '/LICENSE" target="_blank">GPLv2+</a>',
         'requirements'   => [
             'glpi' => [
                 'min' => PLUGIN_TAG_MIN_GLPI,
@@ -195,4 +210,33 @@ function idealTextColor($hexTripletColor)
             + ($components['G'] * 0.587)
             + ($components['B'] * 0.114);
     return (((255 - $bgDelta) < $nThreshold) ? "#000000" : "#ffffff");
+}
+
+function plugin_tag_geturl(): string
+{
+    /** @var array $CFG_GLPI */
+    global $CFG_GLPI;
+    return sprintf('%s/plugins/tag', $CFG_GLPI['url_base']);
+}
+
+function plugin_tag_register_plugin_types(): void
+{
+    $types = QuestionTypesManager::getInstance();
+    $type_mapper = TypesConversionMapper::getInstance();
+    $destination_manager = FormDestinationManager::getInstance();
+
+    // Register question type category
+    $types->registerPluginCategory(new PluginTagQuestionTypeCategory());
+
+    // Register question type
+    $types->registerPluginQuestionType(new PluginTagQuestionType());
+
+    // Register question type itil fields
+    $destination_manager->registerPluginCommonITILConfigField(
+        AbstractCommonITILFormDestination::class,
+        new PluginTagDestinationField(),
+    );
+
+    // Register mapper for legacy question type
+    $type_mapper->registerPluginQuestionTypeConverter('tag', new PluginTagQuestionType());
 }

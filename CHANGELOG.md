@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.14.2] - 2025-12-02
+
+### Fixed
+
+- Improve tag handling: correctly add, update, and remove tags
+
+## [2.14.1] - 2025-11-20
+
+### Fixed
+
+- Improve tag handling: correctly add, update, and remove tags
+
+## [2.14.0] - 2025-11-13
+
+### Fixed
+
+- Fix menu icon
+- Fix dropdown UI
+- Fix get linked items (move `glpi_computers_items` to `glpi_assets_assets_peripheralassets`)
+- Fig tag entity display
+
+### Added
+
+- Add `External Event` for associated item types
+- Implement `Tag` question type for new GLPI forms
+- Implement `Tag` config field for ITIL form destinations
+
+## [2.13.0] - 2025-09-30
+
+### Added
+
+- GLPI 11 compatibility
+
 ## [2.12.5] - 2025-09-29
 
 ### Fixed

@@ -27,8 +27,15 @@
  * @link      https://github.com/pluginsGLPI/tag
  * -------------------------------------------------------------------------
  */
-
 use Glpi\Application\View\TemplateRenderer;
+use Glpi\Asset\Asset_PeripheralAsset;
+use Glpi\DBAL\QueryExpression;
+use Glpi\Form\Form;
+use Glpi\Message\MessageType;
+
+use function Safe\json_decode;
+use function Safe\json_encode;
+use function Safe\preg_match;
 
 class PluginTagTag extends CommonDropdown
 {
@@ -36,11 +43,12 @@ class PluginTagTag extends CommonDropdown
     public $dohistory = true;
 
     public const S_OPTION = 10500;
+
     public static $rightname = 'plugin_tag_tag';
 
     public static function getTypeName($nb = 1)
     {
-        return _n('Tag', 'Tags', $nb, 'tag');
+        return _sn('Tag', 'Tags', $nb, 'tag');
     }
 
     /**
@@ -85,7 +93,7 @@ class PluginTagTag extends CommonDropdown
 
         foreach ($tags->find(['is_active' => 1]) as $tag) {
             if (!empty($tag['type_menu'])) {
-                $types_menu = array_merge($types_menu, json_decode($tag['type_menu']));
+                $types_menu = array_merge($types_menu, json_decode((string) $tag['type_menu']));
             } else {
                 $use_global_tag = true;
             }
@@ -112,7 +120,8 @@ class PluginTagTag extends CommonDropdown
                 $type_menu_elements[$group_label][$itemtype] = $itemtype::getTypeName();
             }
         }
-        $type_menu_values = !empty($this->fields['type_menu']) ? json_decode($this->fields['type_menu']) : [];
+
+        $type_menu_values = empty($this->fields['type_menu']) ? [] : json_decode((string) $this->fields['type_menu']);
 
         TemplateRenderer::getInstance()->display('@tag/forms/tag.html.twig', [
             'item'               => $this,
@@ -136,11 +145,11 @@ class PluginTagTag extends CommonDropdown
         $default_collation = DBConnection::getDefaultCollation();
         $default_key_sign = DBConnection::getDefaultPrimaryKeySignOption();
 
-        $table = getTableForItemType(__CLASS__);
+        $table = getTableForItemType(self::class);
 
         if (!$DB->tableExists($table)) {
             $query = <<<SQL
-                CREATE TABLE IF NOT EXISTS `$table` (
+                CREATE TABLE IF NOT EXISTS `{$table}` (
                     `id`           int {$default_key_sign} NOT NULL auto_increment,
                     `entities_id`  int {$default_key_sign} NOT NULL DEFAULT '0',
                     `is_recursive` tinyint NOT NULL DEFAULT '1',
@@ -156,7 +165,7 @@ class PluginTagTag extends CommonDropdown
                     KEY `is_active` (`is_active`)
                 ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;
 SQL;
-            $DB->doQueryOrDie($query);
+            $DB->doQuery($query);
         } else {
             if (!$DB->fieldExists($table, 'type_menu')) {
                 $migration->addField($table, 'type_menu', "text");
@@ -178,7 +187,7 @@ SQL;
         // Version 0.90-1.1
         // Disable cache on field list as cache wes not pruned after adding field
         $fields = $DB->listFields($table, false);
-        if (stristr($fields['type_menu']["Type"], 'varchar') !== false) {
+        if (stristr((string) $fields['type_menu']["Type"], 'varchar') !== false) {
             $migration->changeField($table, 'type_menu', 'type_menu', 'text');
             $migration->dropKey($table, 'type_menu');
             $migration->migrationOneTable($table);
@@ -194,7 +203,7 @@ SQL;
 
         // Add full rights to profiles that have READ or UPDATE config right
         $migration->addRight(self::$rightname);
-        $migration->displayWarning("Tags now have rights. Please review all profiles to set the required level of rights.");
+        $migration->addMessage(MessageType::Warning, "Tags now have rights. Please review all profiles to set the required level of rights.");
 
         if (Session::haveRight(Config::$rightname, READ | UPDATE)) {
             // Update active profile to give access without having to logout/login
@@ -209,27 +218,27 @@ SQL;
         /** @var DBmysql $DB */
         global $DB;
 
-        $DB->deleteOrDie('glpi_logs', [
+        $DB->delete('glpi_logs', [
             'OR' => [
-                'itemtype_link' => __CLASS__,
-                'itemtype'      => __CLASS__,
+                'itemtype_link' => self::class,
+                'itemtype'      => self::class,
             ],
         ]);
-        $DB->deleteOrDie('glpi_savedsearches', [
-            'itemtype'      => __CLASS__,
+        $DB->delete('glpi_savedsearches', [
+            'itemtype'      => self::class,
         ]);
-        $DB->deleteOrDie('glpi_savedsearches_users', [
-            'itemtype'      => __CLASS__,
+        $DB->delete('glpi_savedsearches_users', [
+            'itemtype'      => self::class,
         ]);
-        $DB->deleteOrDie('glpi_displaypreferences', [
+        $DB->delete('glpi_displaypreferences', [
             'OR' => [
-                'itemtype'      => __CLASS__,
+                'itemtype'      => self::class,
                 'num'           => self::S_OPTION,
             ],
         ]);
 
         $migration = new Migration(PLUGIN_TAG_VERSION);
-        $migration->dropTable(getTableForItemType(__CLASS__));
+        $migration->dropTable(getTableForItemType(self::class));
 
         return true;
     }
@@ -237,20 +246,25 @@ SQL;
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
     {
         $tab    = [];
-        $tab[2] = _n('Associated item', 'Associated items', 2); //Note : can add nb_element here
+
+        $nb = 0;
+        if ($item instanceof CommonDBTM && $_SESSION['glpishow_count_on_tabs']) {
+            $nb = countElementsInTable(PluginTagTagItem::getTable(), [
+                'plugin_tag_tags_id' => $item->getID(),
+            ]);
+        }
+
+        $tab[2] = self::createTabEntry(_sn('Associated item', 'Associated items', 2), $nb, $item::getType(), 'ti ti-list');
         return $tab;
     }
 
     public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0)
     {
-        if ($item instanceof self) {
-            switch ($tabnum) {
-                case 2:
-                    $tagitem = new PluginTagTagItem();
-                    $tagitem->showForTag($item);
-                    break;
-            }
+        if ($item instanceof self && $tabnum === 2) {
+            $tagitem = new PluginTagTagItem();
+            $tagitem->showForTag($item);
         }
+
         return true;
     }
 
@@ -258,7 +272,7 @@ SQL;
     {
         $ong = [];
         $this->addDefaultFormTab($ong);
-        $this->addStandardTab(__CLASS__, $ong, $options);
+        $this->addStandardTab(self::class, $ong, $options);
         $this->addStandardTab('PluginTagTagItem', $ong, $options);
         $this->addStandardTab('Log', $ong, $options);
         return $ong;
@@ -277,13 +291,23 @@ SQL;
         /** @var DBmysql $DB */
         global $DB;
 
-        $query = "SELECT `itemtype`, `items_id`
-                FROM `glpi_computers_items`
-                WHERE `computers_id` = '" . $this->getID() . "'";
         $tab = [];
-        foreach ($DB->request($query) as $data) {
-            $tab[$data['itemtype']][$data['items_id']] = $data['items_id'];
+        $iterator = $DB->request([
+            'SELECT'    => [
+                'itemtype_peripheral',
+                'items_id_peripheral',
+            ],
+            'FROM'      => getTableForItemType(Asset_PeripheralAsset::class),
+            'WHERE'     => [
+                'itemtype_asset'                => Computer::class,
+                'items_id_asset'                => $this->getID(),
+            ],
+        ]);
+
+        foreach ($iterator as $data) {
+            $tab[$data['itemtype_peripheral']][$data['items_id_peripheral']] = $data['items_id_peripheral'];
         }
+
         return $tab;
     }
 
@@ -292,93 +316,69 @@ SQL;
     {
         $tagitems = new PluginTagTagItem();
         $data = $tagitems->find(['plugin_tag_tags_id' => $this->getID()]);
-        if (count($data) == 0) {
-            return false;
-        }
-        return true;
+        return count($data) != 0;
     }
 
     public function rawSearchOptions()
     {
-
-        $tab = [];
-
-        $tab[] = [
+        return [[
             'id'            => 'common',
-            'name'          => __('Characteristics'),
-        ];
-
-        $tab[] = [
+            'name'          => __s('Characteristics'),
+        ], [
             'id'            => 1,
             'table'         => $this->getTable(),
             'field'         => 'name',
-            'name'          => __('Name'),
+            'name'          => __s('Name'),
             'datatype'      => 'itemlink',
             'massiveaction' => true,
-        ];
-
-        $tab[] = [
+        ], [
             'id'            => 2,
             'table'         => $this->getTable(),
             'field'         => 'comment',
-            'name'          => __('Description'),
+            'name'          => __s('Description'),
             'datatype'      => 'string',
             'massiveaction' => true,
-        ];
-
-        $tab[] = [
+        ], [
             'id'            => 3,
             'table'         => $this->getTable(),
             'field'         => 'id',
-            'name'          => __('ID'),
+            'name'          => __s('ID'),
             'datatype'      => 'number',
             'massiveaction' => false,
-        ];
-
-        $tab[] = [
+        ], [
             'id'            => 4,
             'table'         => 'glpi_entities',
             'field'         => 'completename',
             'linkfield'     => 'entities_id',
-            'name'          => __('Entity'),
+            'name'          => __s('Entity'),
             'datatype'      => 'dropdown',
-        ];
-
-        $tab[] = [
+        ], [
             'id'            => 5,
             'table'         => $this->getTable(),
             'field'         => 'is_recursive',
-            'name'          => __('Child entities'),
+            'name'          => __s('Child entities'),
             'datatype'      => 'bool',
-        ];
-
-        $tab[] = [
+        ], [
             'id'            => 6,
             'table'         => $this->getTable(),
             'field'         => 'type_menu',
-            'name'          => _n('Associated item type', 'Associated item types', 2),
+            'name'          => _sn('Associated item type', 'Associated item types', 2),
             'searchtype'    => ['equals', 'notequals'],
             'datatype'      => 'specific',
-        ];
-
-        $tab[] = [
+        ], [
             'id'            => 7,
             'table'         => $this->getTable(),
             'field'         => 'color',
-            'name'          => __('HTML color', 'tag'),
+            'name'          => __s('HTML color', 'tag'),
             'searchtype'    => 'contains',
             'datatype'      => 'specific',
-        ];
-
-        $tab[] = [
+        ], [
             'id'            => 8,
             'table'         => $this->getTable(),
             'field'         => 'is_active',
-            'name'          => __('Active'),
+            'name'          => __s('Active'),
             'datatype'      => 'bool',
-        ];
-
-        return $tab;
+        ]];
     }
 
     public static function getSpecificValueToSelect($field, $name = '', $values = '', array $options = [])
@@ -388,46 +388,48 @@ SQL;
         if (!is_array($values)) {
             $values = [$field => $values];
         }
-        switch ($field) {
-            case 'type_menu':
-                $elements  = ['' => Dropdown::EMPTY_VALUE];
-                $supported_itemtypes = $CFG_GLPI['plugin_tag_itemtypes'] ?? [];
-                foreach ($supported_itemtypes as $itemtypes) {
-                    foreach ($itemtypes as $itemtype) {
-                        $item = getItemForItemtype($itemtype);
-                        $elements[$itemtype] = $item::getTypeName();
-                    }
-                }
 
-                return Dropdown::showFromArray(
-                    $name,
-                    $elements,
-                    ['display' => false,
-                        'value'   => $values[$field],
-                    ],
-                );
+        if ($field === 'type_menu') {
+            $elements  = ['' => Dropdown::EMPTY_VALUE];
+            $supported_itemtypes = $CFG_GLPI['plugin_tag_itemtypes'] ?? [];
+            foreach ($supported_itemtypes as $itemtypes) {
+                foreach ($itemtypes as $itemtype) {
+                    $item = getItemForItemtype($itemtype);
+                    $elements[$itemtype] = $item::getTypeName();
+                }
+            }
+
+            return Dropdown::showFromArray(
+                $name,
+                $elements,
+                ['display' => false,
+                    'value'   => $values[$field],
+                ],
+            );
         }
 
         return parent::getSpecificValueToSelect($field, $name, $values, $options);
     }
+
     public static function getSpecificValueToDisplay($field, $values, array $options = [])
     {
         switch ($field) {
             case 'type_menu':
-                $itemtypes = json_decode($values[$field]);
+                $itemtypes = empty($values[$field]) ? [] : json_decode((string) $values[$field], true);
                 if (!is_array($itemtypes)) {
                     return "&nbsp;";
                 }
+
                 $itemtype_names = [];
                 foreach ($itemtypes as $itemtype) {
                     $item = getItemForItemtype($itemtype);
                     $itemtype_names[] = $item->getTypeName();
                 }
-                $out = implode(", ", $itemtype_names);
-                return $out;
+
+                return implode(", ", $itemtype_names);
             case 'color':
                 $color = $values[$field] ?: '#DDDDDD';
-                return "<div style='background-color: $color;'>&nbsp;</div>";
+                return sprintf("<div style='background-color: %s;'>&nbsp;</div>", $color);
         }
 
         return parent::getSpecificValueToDisplay($field, $values, $options);
@@ -443,6 +445,7 @@ SQL;
             $rule->getFromDB($id);
             return $rule->fields["sub_type"];
         }
+
         return $itemtype;
     }
 
@@ -453,7 +456,7 @@ SQL;
      *
      * @param  array $params should contains theses keys:
      *                          - item the CommonDBTM object
-     * @return bool|void False if the form was not shown. Otherwise nothing is returned and the form is displayed.
+     * @return bool|null False if the form was not shown. Otherwise nothing is returned and the form is displayed.
      */
     public static function showForItem($params = [])
     {
@@ -466,7 +469,7 @@ SQL;
             && $params['item'] instanceof CommonDBTM
         ) {
             $item     = $params['item'];
-            $itemtype = get_class($item);
+            $itemtype = $item::class;
 
             if (self::canItemtype($itemtype)) {
                 // manage values after a redirect (ex ticket creation, after a cat change)
@@ -475,28 +478,15 @@ SQL;
                     $value = $item->input['_plugin_tag_tag_values'];
                 }
 
-                $field_class = "form-field row col-12 col-sm-6 px-3 mt-2 mb-n2";
-                $label_class = "col-form-label col-xxl-5 text-xxl-end";
-                $input_class = "col-xxl-7 field-container";
-
-                if ($item instanceof CommonITILObject) {
-                    $field_class = "form-field row col-12 mb-2";
-                    $label_class = "col-form-label col-xxl-4 text-xxl-end";
-                    $input_class = "col-xxl-8 field-container";
-                }
-
-                echo "<div class='$field_class'>";
-                echo "<div class='$label_class'>" . _n('Tag', 'Tags', 2, 'tag') . "</div>";
-                echo "<div class='$input_class'>";
                 self::showTagDropdown([
                     'itemtype' => $itemtype,
                     'id'       => $item->getId(),
                     'value'    => $value,
                 ]);
-                echo "</div>";
-                echo "</div>";
             }
         }
+
+        return null;
     }
 
     /**
@@ -521,6 +511,7 @@ SQL;
             if (!isset($params['content'])) {
                 $params['content'] = "";
             }
+
             $iterator = $DB->request([
                 'SELECT'    => [
                     'name',
@@ -548,13 +539,15 @@ SQL;
                 $name = $data['name'];
                 $color = $data['color'] ?: '#DDDDDD';
                 $textcolor = idealTextColor($color);
-                $style = "background-color: {$color}; color: {$textcolor};";
-                $content .= "<span class='tag_choice' style='{$style}' title='{$title}'>{$name}</span>&nbsp;&nbsp;";
+                $style = sprintf('background-color: %s; color: %s;', $color, $textcolor);
+                $content .= sprintf("<span class='tag_choice' style='%s' title='%s'>%s</span>&nbsp;&nbsp;", $style, $title, $name);
             }
+
             $content .= "</div>";
             $params['content'] .= $content;
             return $params;
         }
+
         return null;
     }
 
@@ -587,11 +580,12 @@ SQL;
                 ],
             ]);
 
-            $params['metadata']['tags'] = $params['metadata']['tags'] ?? [];
+            $params['metadata']['tags'] ??= [];
             foreach ($iterator as $data) {
                 $params['metadata']['tags'][] = $data['name'];
             }
         }
+
         return $params;
     }
 
@@ -613,191 +607,123 @@ SQL;
         ];
         $params = array_merge($default_params, $params);
 
-        // check itemtype
         $itemtype = self::parseItemtype($params['itemtype'], $params['id']);
-        $obj = new $itemtype();
-
-        // Object must be an instance of CommonDBTM (or inherint of this)
-        if (!$obj instanceof CommonDBTM) {
+        if (!is_a($itemtype, CommonDBTM::class, true)) {
             return;
         }
 
-        // instanciate needed objects
+        $obj = new $itemtype();
+
         $tag      = new self();
         $tag_item = new PluginTagTagItem();
 
-        // retrieve current item
         if (isset($params['id'])) {
             $obj->getFromDB($params['id']);
         }
+
         if ($obj->isNewItem()) {
             $obj->getEmpty();
         }
 
-        // find values for this items
         $values = [];
         if (!$obj->isNewItem()) {
             foreach (
-                $tag_item->find(['items_id' => $params['id'],
-                    'itemtype' => $itemtype,
-                ]) as $found_item
+                $tag_item->find(['items_id' => $params['id'], 'itemtype' => $itemtype]) as $found_item
             ) {
                 $values[] = $found_item['plugin_tag_tags_id'];
             }
         } elseif (is_string($params['value'])) {
-            $values = !empty($params['value']) ? explode(',', $params['value']) : [];
+            $values = empty($params['value']) ? [] : explode(',', $params['value']);
         } elseif (is_array($params['value'])) {
             $values = $params['value'];
         }
 
-        // Restrict tags finding by itemtype and entity
+        /** @var DBmysql $DB */
+        global $DB;
+
         $where = [
             'is_active' => 1,
             'OR' => [
                 ['type_menu' => null],
                 ['type_menu' => ''],
                 ['type_menu' => 0],
-                ['type_menu' => ['LIKE', '%"' . $itemtype . '"%']],
+                new QueryExpression("JSON_CONTAINS(type_menu, " . $DB->quote('"' . addslashes((string) $itemtype) . '"') . ")"),
             ],
         ];
         if ($obj->isEntityAssign()) {
             $where += getEntitiesRestrictCriteria('', '', '', true);
         }
 
-        // found existing tags
-        $existing_tags = $tag->find($where, 'name');
-        $select2_tags = [];
-        foreach ($existing_tags as $existing_tag) {
-            $select2_tags[] = [
-                'id'       => $existing_tag['id'],
-                'text'     => $existing_tag['name'],
-                'color'    => $existing_tag['color'],
-                'selected' => in_array($existing_tag['id'], $values),
-            ];
-        }
-        // new tags restored from saved input
-        $new_tags = array_diff($values, array_column($existing_tags, 'id'));
-        foreach ($new_tags as $new_tag) {
-            $select2_tags[] = [
-                'id'       => $new_tag,
-                'text'     => preg_replace('/^newtag_(.+)/', '$1', $new_tag),
-                'selected' => true,
-            ];
+        $available_tags = $tag->find($where, 'name');
+        foreach ($available_tags as $tag_data) {
+            $available_tags[$tag_data['id']] = $tag_data['name'];
+            $available_tags_color[$tag_data['id']] = $tag_data['color'] ?: '#DDDDDD';
         }
 
-        // create an input receiving the tag tokens
-        $extra_class = "";
-        if ($obj instanceof CommonITILTask) {
-            $extra_class = "mb-3";
+        $selected_tags = [];
+        $select_tags = $tag_item->find(['items_id' => $params['id'], 'itemtype' => $itemtype]);
+        foreach ($select_tags as $tag_item_data) {
+            $tag_data = $tag->getFromDB($tag_item_data['plugin_tag_tags_id']);
+            if ($tag_data) {
+                $selected_tags[] = $tag_item_data['plugin_tag_tags_id'];
+            }
         }
-
-        echo "<div class='btn-group btn-group-sm w-100 $extra_class'>";
 
         $rand = mt_rand();
-        echo Html::hidden('_plugin_tag_tag_process_form', ['value' => '1',]);
-        echo Html::select(
-            '_plugin_tag_tag_values[]',
-            [],
-            [
-                'id'       => "tag_select_$rand",
-                'class'    => 'tag_select',
-                'multiple' => 'multiple',
-            ],
-        );
 
-        // prefix value by 'newtag_' to differenciate created tag from existing ones
-        $token_creation = "return { id: 'newtag_'+ params.term, text: params.term };";
-        if (!self::canCreate()) {
-            $token_creation = "return null;";
-        }
+        $token_creation = self::canCreate()
+            ? "return { id: 'newtag_'+ params.term, text: params.term };"
+            : "return null;";
 
-        // Returns false if at least one item in "items_ids" cannot be updated
-        $can_update_all = count(array_filter($params['items_ids'], function ($value) use ($obj) {
+        $can_update_all = array_filter($params['items_ids'], function ($value) use ($obj) {
             $obj->getFromDB($value);
             return !$obj->canUpdateItem();
-        })) === 0;
+        }) === [];
 
         $readOnly = !$tag::canUpdate()
             || ($obj->isNewItem() && !$obj->canCreateItem())
             || (!$obj->isNewItem() && !$obj->canUpdateItem())
             || (!empty($params['items_ids']) && !$can_update_all);
 
-        // call select2 lib for this input
-        echo Html::scriptBlock("
-            $(function() {
-                $('#tag_select_$rand').select2({
-                    width: 'calc(100% - 20px)',
-                    templateResult: formatOptionResult,
-                    templateSelection: formatOptionSelection,
-                    formatSearching: '" . __("Loading...") . "',
-                    dropdownCssClass: 'tag_select_results',
-                    data: " . json_encode($select2_tags) . ",
-                    tags: true,
-                    tokenSeparators: [',', ';'],
-                    disabled: " . ($readOnly ? 'true' : 'false') . ",
-                    createTag: function (params) {
-                        var term = $.trim(params.term);
-                        if (term === '') {
-                            return null;
-                        }
-                        $token_creation
-                    }
-                });
-            });
-        ");
+        $can_create = self::canCreate();
 
-        // Show tooltip
-        if (self::canCreate()) {
-            echo "<div class='btn btn-outline-secondary'>";
-            echo Html::showToolTip(
-                __("View all tags", 'tag'),
-                ['link' => self::getSearchURL()],
-            );
-            echo "</div>";
-        }
-
-        // save tag in AJAX mode when ITIL object is closed
         if (!$readOnly && $obj instanceof CommonITILObject && $obj->isClosed()) {
-            // save button
-            echo Html::submit(
-                "<i class='far fa-save'></i>",
-                [
-                    'name' => 'save_tag',
-                    'id' => 'save_tag',
-                    'class' => 'btn btn-outline-primary',
-                ],
-            );
-
-            $url = Plugin::getWebDir('tag', true) . '/ajax/tag.php';
-
-            echo Html::scriptBlock("
-                $(function() {
-                    $('#save_tag').on('click', function (e) {
-                        e.preventDefault();
-                        $.ajax({
-                            url: '$url',
-                            type: 'POST',
-                            data: {
-                                'itemtype': '$itemtype',
-                                'items_id': " . $params['id'] . ",
-                                '_plugin_tag_tag_values': $('#tag_select_$rand').val(),
-                                '_plugin_tag_tag_process_form': 1,
-                            }
-                        });
-                        displayAjaxMessageAfterRedirect();
-                        window.glpiUnsavedFormChanges = false;
-                    });
-                });
-            ");
+            $show_save_button = true;
+            $url = plugin_tag_geturl() . '/ajax/tag.php';
         }
 
-        echo "</div>";
+        if ($obj instanceof CommonITILTask) {
+            $extra_class = "mb-3";
+        }
+
+        $tag_location = Config::getConfigurationValues('plugin:Tag')['tags_location'] ?? 0;
+
+        TemplateRenderer::getInstance()->display('@tag/tag_dropdown.html.twig', [
+            'extra_class'       => $extra_class ?? '',
+            'selected_tags'     => $selected_tags,
+            'available_tags'    => $available_tags,
+            'tags_color'        => $available_tags_color ?? [],
+            'rand'              => $rand,
+            'token_creation'    => $token_creation,
+            'readOnly'          => $readOnly,
+            'can_create'        => $can_create,
+            'show_save_button'  => $show_save_button ?? false,
+            'url'               => $url ?? '',
+            'itemtype'          => $itemtype,
+            'icon'              => Computer::getIcon(),
+            'items_id'          => $params['id'],
+            'in_itilobject'     => $obj instanceof CommonITILObject,
+            'is_dropdown'       => $obj instanceof CommonDropdown,
+            'is_form'           => $obj instanceof Form,
+            'is_new_item'       => $obj->isNewItem(),
+            'tag_search_url'    => self::getSearchURL(),
+            'tag_location'      => $tag_location,
+        ]);
     }
 
     public static function getTagForEntityName($completename = "")
     {
-        $plus_rootentity = sprintf(__('%1$s + %2$s'), '', __('Child entities'));
-        $completename    = Html::entity_decode_deep($completename);
+        $plus_rootentity = sprintf(__s('%1$s + %2$s'), '', __s('Child entities'));
         $completename    = trim(str_replace($plus_rootentity, '', $completename));
         $entities_id     = Entity::getEntityIDByCompletename($completename);
 
@@ -816,13 +742,14 @@ SQL;
     {
         $plugintagtag = new self();
         $plugintagtag->getFromDB($tag_id);
+
         $color = $plugintagtag->fields["color"] ?: '#DDDDDD';
         $inv_color = idealTextColor($color);
-        $style = "background-color: $color; border: 1px solid $inv_color; color: $inv_color";
+        $style = sprintf('background-color: %s; color: %s', $color, $inv_color);
 
         return "<span class='select2-search-choice tag_choice'
-                    style='padding-left:5px;$style'>" .
-              $separator . $plugintagtag->fields['name'] . '</span>';
+                    style='padding-left:5px;{$style}'>"
+              . $separator . $plugintagtag->fields['name'] . '</span>';
     }
 
     public function prepareInputForAdd($input)
@@ -867,21 +794,20 @@ SQL;
     {
         $msg              = [];
         $checkKo          = false;
-        $mandatory_fields = ['name' => __('Name')];
+        $mandatory_fields = ['name' => __s('Name')];
 
         foreach ($input as $key => $value) {
-            if (isset($mandatory_fields[$key])) {
-                if (empty($value)) {
-                    $msg[]   = $mandatory_fields[$key];
-                    $checkKo = true;
-                }
+            if (isset($mandatory_fields[$key]) && empty($value)) {
+                $msg[]   = $mandatory_fields[$key];
+                $checkKo = true;
             }
         }
 
         if ($checkKo) {
-            Session::addMessageAfterRedirect(sprintf(__("Mandatory fields are not filled. Please correct: %s"), implode(', ', $msg)), true, ERROR);
+            Session::addMessageAfterRedirect(sprintf(__s("Mandatory fields are not filled. Please correct: %s"), implode(', ', $msg)), true, ERROR);
             return false;
         }
+
         return true;
     }
 
@@ -892,31 +818,32 @@ SQL;
      */
     public static function getCurrentItemtype()
     {
+        $request_uri = $_SERVER['REQUEST_URI'] ?? ''; // $_SERVER['REQUEST_URI'] from CLI context is empty
         $itemtype = '';
         if (
-            preg_match('/\/(?:marketplace|plugins)\/genericobject\/front\/object\.form.php/', $_SERVER['PHP_SELF'])
+            preg_match('/\/(?:marketplace|plugins)\/genericobject\/front\/object\.form.php/', (string) $request_uri)
             && array_key_exists('itemtype', $_GET)
         ) {
             $itemtype = $_GET['itemtype'];
         } elseif (
             preg_match(
                 '/\/(?:marketplace|plugins)\/([a-zA-Z]+)\/front\/([a-zA-Z]+).form.php/',
-                $_SERVER['PHP_SELF'],
+                (string) $request_uri,
                 $matches,
-            )
+            ) !== 0
         ) {
             $itemtype = 'Plugin' . ucfirst($matches[1]) . ucfirst($matches[2]);
-        } elseif (preg_match('/([a-zA-Z]+).form.php/', $_SERVER['PHP_SELF'], $matches)) {
+        } elseif (preg_match('/([a-zA-Z]+).form.php/', (string) $request_uri, $matches) !== 0) {
             $itemtype = $matches[1];
         } elseif (
             preg_match(
                 '/\/(?:marketplace|plugins)\/([a-zA-Z]+)\/front\/([a-zA-Z]+).php/',
-                $_SERVER['PHP_SELF'],
+                (string) $request_uri,
                 $matches,
-            )
+            ) !== 0
         ) {
             $itemtype = 'Plugin' . ucfirst($matches[1]) . ucfirst($matches[2]);
-        } elseif (preg_match('/([a-zA-Z]+).php/', $_SERVER['PHP_SELF'], $matches)) {
+        } elseif (preg_match('/([a-zA-Z]+).php/', (string) $request_uri, $matches) !== 0) {
             $itemtype = $matches[1];
         }
 
@@ -927,6 +854,7 @@ SQL;
 
         return false;
     }
+
 
     public static function getIcon()
     {

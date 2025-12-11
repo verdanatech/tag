@@ -4,17 +4,17 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit86fa578dbab65999fa3879c025c2d652
+class ComposerStaticInit0bb7734a8837cdd118f20d259d3613e7
 {
     public static $prefixLengthsPsr4 = array (
-        'G' => 
+        'G' =>
         array (
             'GlpiPlugin\\Tag\\Tests\\' => 21,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'GlpiPlugin\\Tag\\Tests\\' => 
+        'GlpiPlugin\\Tag\\Tests\\' =>
         array (
             0 => __DIR__ . '/../..' . '/tests',
         ),
@@ -27,9 +27,9 @@ class ComposerStaticInit86fa578dbab65999fa3879c025c2d652
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit86fa578dbab65999fa3879c025c2d652::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit86fa578dbab65999fa3879c025c2d652::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticInit86fa578dbab65999fa3879c025c2d652::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit0bb7734a8837cdd118f20d259d3613e7::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit0bb7734a8837cdd118f20d259d3613e7::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInit0bb7734a8837cdd118f20d259d3613e7::$classMap;
 
         }, null, ClassLoader::class);
     }
