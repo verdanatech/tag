@@ -28,7 +28,9 @@
  * -------------------------------------------------------------------------
  */
 
-include("../../../inc/includes.php");
+use Glpi\Exception\Http\BadRequestHttpException;
+
+use function Safe\json_encode;
 
 header("Content-Type: text/html; charset=UTF-8");
 Html::header_nocache();
@@ -39,6 +41,10 @@ if (isset($_POST['itemtype'], $_POST['items_id'])) {
     $itemType = $_POST['itemtype'];
     $itemId = $_POST['items_id'];
 
+    if (!is_a($itemType, CommonDBTM::class, true)) {
+        throw new BadRequestHttpException(__s('Invalid item type', 'tag'));
+    }
+
     $obj = new $itemType();
     $obj->getFromDB($itemId);
     $obj->input = $_POST;
@@ -46,26 +52,14 @@ if (isset($_POST['itemtype'], $_POST['items_id'])) {
 
     if ($success) {
         Session::addMessageAfterRedirect(
-            __('Tags have been updated', 'tag'),
+            __s('Tags have been updated', 'tag'),
             false,
             INFO,
         );
         echo json_encode(['success' => true]);
     } else {
-        http_response_code(400);
-        Session::addMessageAfterRedirect(
-            __('Tags have not been updated', 'tag'),
-            false,
-            ERROR,
-        );
-        echo json_encode(['success' => false]);
+        throw new BadRequestHttpException(__s('Tags have not been updated', 'tag'));
     }
 } else {
-    http_response_code(400);
-    Session::addMessageAfterRedirect(
-        __('Missing parameters', 'tag'),
-        false,
-        ERROR,
-    );
-    echo json_encode(['success' => false]);
+    throw new BadRequestHttpException(__s('Missing parameters', 'tag'));
 }
