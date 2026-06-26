@@ -28,14 +28,14 @@
  * -------------------------------------------------------------------------
  */
 
-include("../../../inc/includes.php");
+use Glpi\Exception\Http\BadRequestHttpException;
 
 header("Content-Type: text/html; charset=UTF-8");
 Html::header_nocache();
 Session::checkLoginUser();
 
 if (!isset($_REQUEST['name'])) {
-    exit;
+    throw new BadRequestHttpException();
 }
 
 echo PluginTagTag::getTagForEntityName($_REQUEST['name']);

@@ -28,32 +28,22 @@
  * -------------------------------------------------------------------------
  */
 
-include('../../../inc/includes.php');
+use Glpi\Form\QuestionType\QuestionTypeCategoryInterface;
 
-Session::checkRight(PluginTagTag::$rightname, UPDATE);
+final class PluginTagQuestionTypeCategory implements QuestionTypeCategoryInterface
+{
+    public function getLabel(): string
+    {
+        return __s('Tag', 'tag');
+    }
 
-if (!Plugin::isPluginActive("tag")) {
-    Html::displayNotFoundError();
-}
+    public function getIcon(): string
+    {
+        return 'ti ti-tag';
+    }
 
-if (isset($_POST['add'])) {
-    $item = new PluginTagTagItem();
-
-    // Check unicity :
-    if (isset($_REQUEST['plugin_tag_tags_id'])) {
-        $found = $item->find([
-            'plugin_tag_tags_id' => $_REQUEST['plugin_tag_tags_id'],
-            'items_id' => $_REQUEST['items_id'],
-            'itemtype' => $_REQUEST['itemtype'],
-        ]);
-
-        if (count($found) == 0) {
-            $item->add($_REQUEST);
-        }
-    } else {
-        $item->add($_REQUEST);
+    public function getWeight(): int
+    {
+        return 1000;
     }
 }
-
-$dropdown = new PluginTagTag();
-include(GLPI_ROOT . "/front/dropdown.common.form.php");

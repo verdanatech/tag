@@ -13,7 +13,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: GLPI Plugin - Tag\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-07-25 00:51+0000\n"
+"POT-Creation-Date: 2026-05-13 01:54+0000\n"
 "PO-Revision-Date: 2015-09-18 12:56+0000\n"
 "Last-Translator: EpicIT33, 2025\n"
 "Language-Team: French (France) (http://app.transifex.com/teclib/glpi-plugin-tag/language/fr_FR/)\n"
@@ -23,59 +23,65 @@ msgstr ""
 "Language: fr_FR\n"
 "Plural-Forms: nplurals=3; plural=(n == 0 || n == 1) ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
 
-#: hook.php:199 hook.php:320
-msgid "Add tags"
-msgstr "Ajouter des étiquettes"
+#: templates/dropdown.html.twig
+msgid "Tags"
+msgstr ""
 
-#: hook.php:201
-msgid "Remove tags"
-msgstr "Supprimer des étiquettes"
+#: ajax/tag.php:45
+msgid "Invalid item type"
+msgstr ""
 
-#: ajax/tag.php:49
+#: ajax/tag.php:55
 msgid "Tags have been updated"
 msgstr "Les tags ont été mis à jour"
 
-#: ajax/tag.php:57
+#: ajax/tag.php:61
 msgid "Tags have not been updated"
 msgstr "Les tags n'ont pas été mis à jour"
 
-#: ajax/tag.php:66
+#: ajax/tag.php:64
 msgid "Missing parameters"
 msgstr "Paramètres manquants"
 
-#: setup.php:126
+#: setup.php:137
 msgctxt "filters"
 msgid "If the item has a tag"
 msgstr "Si l'élément a un tag"
 
-#: setup.php:130
+#: setup.php:141
 msgctxt "filters"
 msgid "If the item is tagged"
 msgstr "Si l'élément est tagué"
 
-#: setup.php:169 inc/config.class.php:39 inc/config.class.php:56
+#: setup.php:185 inc/config.class.php:39 inc/config.class.php:58
+#: inc/profile.class.php:35
 msgid "Tag Management"
 msgstr "Gestion des tags"
 
-#: inc/config.class.php:57
-msgid "Tags location"
-msgstr "Localisation des tags"
+#: hook.php:239 hook.php:366
+msgid "Add tags"
+msgstr "Ajouter des étiquettes"
 
-#: inc/tag.class.php:43 inc/tag.class.php:489
+#: hook.php:241
+msgid "Remove tags"
+msgstr "Supprimer des étiquettes"
+
+#: inc/questiontypecategory.class.php:37 inc/destinationfield.class.php:44
+#: inc/tag.class.php:51
 msgid "Tag"
 msgid_plural "Tags"
 msgstr[0] "Etiquette"
 msgstr[1] "Etiquettes"
 msgstr[2] "Etiquettes"
 
-#: inc/tag.class.php:368
+#: inc/config.class.php:59
+msgid "Tags location"
+msgstr "Localisation des tags"
+
+#: inc/tag.class.php:373
 msgid "HTML color"
 msgstr "Couleur HTML"
 
-#: inc/tag.class.php:753
-msgid "View all tags"
-msgstr "Voir toutes les étiquettes"
-
-#: inc/profile.class.php:35 inc/profile.class.php:67
+#: inc/profile.class.php:68
 msgid "Tag management"
 msgstr "Gestion des tags"

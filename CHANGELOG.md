@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [UNRELEASED]
+
+## [2.14.5] - 2026-06-25
+
+### Fixed
+
+- Clear twig cache on install
+
+## [2.14.4] - 2026-06-24
+
+### Fixed
+
+- Fix tag search
+- Fix `webapplication` plugin integration
+- Prevent SQL error when column `name` not exist from `Item_Device`
+- Prevent the tag field from appearing in the satisfaction survey.
+- Fix display translations
+- Removed tag rights during plugin uninstall
+- Fix tag dropdown to allow tag creation directly from the field
+
+## [2.14.3] - 2025-12-22
+
+### Fixed
+
+- Fix tag search
+- Fix quote display in tag destination field strategy labels
+
+## [2.14.2] - 2025-12-02
+
+### Fixed
+
+- Improve tag handling: correctly add, update, and remove tags
+
+## [2.14.1] - 2025-11-20
+
+### Fixed
+
+- Improve tag handling: correctly add, update, and remove tags
+
+## [2.14.0] - 2025-11-13
+
+### Fixed
+
+- Fix menu icon
+- Fix dropdown UI
+- Fix get linked items (move `glpi_computers_items` to `glpi_assets_assets_peripheralassets`)
+- Fig tag entity display
+
+### Added
+
+- Add `External Event` for associated item types
+- Implement `Tag` question type for new GLPI forms
+- Implement `Tag` config field for ITIL form destinations
+
+## [2.13.0] - 2025-09-30
+
+### Added
+
+- GLPI 11 compatibility
+
 ## [2.12.5] - 2025-09-29
 
 ### Fixed

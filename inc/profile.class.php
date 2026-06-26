@@ -32,7 +32,7 @@ class PluginTagProfile extends Profile
 {
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
     {
-        return self::createTabEntry(__('Tag management', 'tag'));
+        return self::createTabEntry(__('Tag Management', 'tag'), 0, $item::getType(), PluginTagTag::getIcon());
     }
 
     public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0)
@@ -41,6 +41,7 @@ class PluginTagProfile extends Profile
             $tagprofile = new self();
             $tagprofile->showForm($item->getID());
         }
+
         return true;
     }
 
@@ -74,6 +75,7 @@ class PluginTagProfile extends Profile
             echo "</div>\n";
             Html::closeForm();
         }
+
         echo "</div>";
 
         return true;

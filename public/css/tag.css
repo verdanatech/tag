@@ -1,6 +1,4 @@
-<?php
-
-/**
+/*!
  * -------------------------------------------------------------------------
  * Tag plugin for GLPI
  * -------------------------------------------------------------------------
@@ -28,11 +26,36 @@
  * -------------------------------------------------------------------------
  */
 
-include('../../../inc/includes.php');
+.select2-container .select2-selection.select2-selection--multiple .select2-selection__rendered .select2-selection__choice {
+   margin-top: 7px !important;
 
-Session::checkLoginUser();
+}
 
-if (Plugin::isPluginActive("tag")) {
-    $dropdown = new PluginTagTag();
-    include(GLPI_ROOT . "/front/dropdown.common.php");
+.select2-container .select2-selection.select2-selection--multiple .select2-selection__rendered .select2-selection__choice .select2-selection__choice__remove {
+   margin-right: 3px !important;
+}
+
+
+.tag_choice {
+   border-radius: 3px;
+   padding: 4px 8px;
+   margin: 2px;
+   display: inline-block;
+   font-size: 11px;
+}
+
+.tab_cadre_pager span.tag_choice {
+   margin: 2px;
+}
+
+.select2-results .tag_choice {
+   padding: 2px 4px;
+}
+
+.kanban-plugin-content .tag_choice {
+   cursor: pointer;
+}
+
+[data-glpi-itildestination-field-config-display-condition="specific_values"] > div > [data-glpi-plugin-tag-dropdown-uuid] ~ div.btn {
+   border-top-right-radius: 0;
 }

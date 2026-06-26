@@ -28,6 +28,41 @@
  * -------------------------------------------------------------------------
  */
 
+use Glpi\Cache\CacheManager;
+use Glpi\Form\Form;
+use Glpi\Plugin\Hooks;
+
+use function Safe\glob;
+use function Safe\preg_match;
+
+/**
+ * -------------------------------------------------------------------------
+ * Tag plugin for GLPI
+ * -------------------------------------------------------------------------
+ *
+ * LICENSE
+ *
+ * This file is part of Tag.
+ *
+ * Tag is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Tag is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Tag. If not, see <http://www.gnu.org/licenses/>.
+ * -------------------------------------------------------------------------
+ * @copyright Copyright (C) 2014-2023 by Teclib'.
+ * @license   GPLv2 https://www.gnu.org/licenses/gpl-2.0.html
+ * @link      https://github.com/pluginsGLPI/tag
+ * -------------------------------------------------------------------------
+ */
+
 // Plugin hook after *Uninstall*
 function plugin_uninstall_after_tag($item)
 {
@@ -69,6 +104,10 @@ function plugin_tag_getAddSearchOptionsNew($itemtype)
                 'table'      => 'glpi_plugin_tag_tagitems',
                 'joinparams' => [
                     'jointype' => 'itemtype_item',
+                    'specific_itemtype' => $itemtype,
+                    'beforejoin' => [
+                        'table' => getTableForItemType($itemtype),
+                    ],
                 ],
             ],
         ],
@@ -81,14 +120,14 @@ function plugin_tag_getAddSearchOptionsNew($itemtype)
 
     $options[] = $so_param;
 
-    if ($itemtype != 'AllAssets') {
+    if (!is_a($itemtype, AllAssets::class, true) && is_a($itemtype, CommonDBTM::class, true)) {
         $item = new $itemtype();
         if ($item->isEntityAssign()) {
             $options [] = [
                 'id'            => (PluginTagTag::S_OPTION + 1),
                 'table'         => PluginTagTag::getTable(),
                 'field'         => 'name',
-                'name'          => PluginTagTag::getTypeName(2) . " - " . __("Entity"),
+                'name'          => PluginTagTag::getTypeName(2) . " - " . __s("Entity"),
                 'datatype'      => 'string',
                 'searchtype'    => 'contains',
                 'massiveaction' => false,
@@ -129,8 +168,8 @@ function plugin_tag_giveItem($type, $field, $data, $num, $linkfield = "")
                     $separator = '<span style="display:none">, </span>';
                 }
             }
-            $out .= '</div></div>';
-            return $out;
+
+            return $out . '</div></div>';
     }
 
     return "";
@@ -139,35 +178,38 @@ function plugin_tag_giveItem($type, $field, $data, $num, $linkfield = "")
 
 function plugin_tag_addHaving($link, $nott, $itemtype, $id, $val, $num)
 {
-    $searchopt = &Search::getOptions($itemtype);
+    $searchopt = Search::getOptions($itemtype);
     $table     = $searchopt[$id]["table"];
     $field     = $searchopt[$id]["field"];
 
-    if ($table . "." . $field == "glpi_plugin_tag_tags.type_menu") {
-        $values = explode(",", $val);
-        $where  = "$link `ITEM_$num` LIKE '%" . $values[0] . "%'";
+    if ($table . "." . $field === "glpi_plugin_tag_tags.type_menu") {
+        $values = explode(",", (string) $val);
+        $where  = sprintf("%s `ITEM_%s` LIKE '%%", $link, $num) . $values[0] . "%'";
         array_shift($values);
         foreach ($values as $value) {
             $value = trim($value);
-            $where .= " OR `ITEM_$num` LIKE '%$value%'";
+            $where .= sprintf(" OR `ITEM_%s` LIKE '%%%s%%'", $num, $value);
         }
+
         return $where;
     }
+
+    return null;
 }
 
 function plugin_tag_addWhere($link, $nott, $itemtype, $id, $val, $searchtype)
 {
-    $searchopt = &Search::getOptions($itemtype);
+    $searchopt = Search::getOptions($itemtype);
     $table     = $searchopt[$id]["table"];
     $field     = $searchopt[$id]["field"];
 
-    if ($table . "." . $field == "glpi_plugin_tag_tags.type_menu") {
+    if ($table . "." . $field === "glpi_plugin_tag_tags.type_menu") {
         switch ($searchtype) {
             case 'equals':
-                return "`glpi_plugin_tag_tags`.`type_menu` LIKE '%\"$val\"%'";
+                return sprintf("`glpi_plugin_tag_tags`.`type_menu` LIKE '%%\"%s\"%%'", $val);
 
             case 'notequals':
-                return "`glpi_plugin_tag_tags`.`type_menu` NOT LIKE '%\"$val\"%'";
+                return sprintf("`glpi_plugin_tag_tags`.`type_menu` NOT LIKE '%%\"%s\"%%'", $val);
         }
     }
 
@@ -196,9 +238,9 @@ function plugin_tag_MassiveActions($itemtype = '')
     if (PluginTagTag::canItemtype($itemtype) && is_a($itemtype, CommonDBTM::class, true) && $itemtype::canUpdate()) {
         return [
             'PluginTagTagItem' . MassiveAction::CLASS_ACTION_SEPARATOR . 'addTag'
-               => __("Add tags", 'tag'),
+               => __s("Add tags", 'tag'),
             'PluginTagTagItem' . MassiveAction::CLASS_ACTION_SEPARATOR . 'removeTag'
-               => __("Remove tags", 'tag'),
+               => __s("Remove tags", 'tag'),
         ];
     }
 
@@ -216,13 +258,13 @@ function plugin_tag_install()
     $migration = new Migration($version['version']);
 
     // Parse inc directory
-    foreach (glob(dirname(__FILE__) . '/inc/*') as $filepath) {
+    foreach (glob(__DIR__ . '/inc/*') as $filepath) {
         // Load *.class.php files and get the class name
-        if (preg_match("/inc.(.+)\.class.php/", $filepath, $matches)) {
+        if (preg_match("/inc.(.+)\.class.php/", $filepath, $matches) !== 0) {
             $classname = 'PluginTag' . ucfirst($matches[1]);
 
             // Don't load Datainjection mapping lass (no install + bug if datainjection is not installed and activated)
-            if ($classname == 'PluginTagTaginjection') {
+            if ($classname === 'PluginTagTaginjection') {
                 continue;
             }
 
@@ -233,6 +275,11 @@ function plugin_tag_install()
             }
         }
     }
+
+    if (version_compare(GLPI_VERSION, '11.0.9', '<')) {
+        (new CacheManager())->resetAllCaches();
+    }
+
     return true;
 }
 
@@ -244,13 +291,13 @@ function plugin_tag_install()
 function plugin_tag_uninstall()
 {
     // Parse inc directory
-    foreach (glob(dirname(__FILE__) . '/inc/*') as $filepath) {
+    foreach (glob(__DIR__ . '/inc/*') as $filepath) {
         // Load *.class.php files and get the class name
-        if (preg_match("/inc.(.+)\.class.php/", $filepath, $matches)) {
+        if (preg_match("/inc.(.+)\.class.php/", $filepath, $matches) !== 0) {
             $classname = 'PluginTag' . ucfirst($matches[1]);
 
             // Don't load Datainjection mapping lass (no uninstall + bug if datainjection is not installed and activated)
-            if ($classname == 'PluginTagTaginjection') {
+            if ($classname === 'PluginTagTaginjection') {
                 continue;
             }
 
@@ -261,6 +308,7 @@ function plugin_tag_uninstall()
             }
         }
     }
+
     return true;
 }
 
@@ -270,22 +318,27 @@ function plugin_tag_post_init()
     global $PLUGIN_HOOKS;
 
     // hook on object changes
-    if ($itemtype = PluginTagTag::getCurrentItemtype()) {
-        if (PluginTagTag::canItemtype($itemtype)) {
-            $PLUGIN_HOOKS['item_add']['tag'][$itemtype]        = ['PluginTagTagItem', 'updateItem'];
-            $PLUGIN_HOOKS['item_update']['tag'][$itemtype]     = ['PluginTagTagItem', 'updateItem'];
-            $PLUGIN_HOOKS['pre_item_update']['tag'][$itemtype]     = ['PluginTagTagItem', 'updateItem'];
-            $PLUGIN_HOOKS['pre_item_purge']['tag'][$itemtype]  = ['PluginTagTagItem', 'purgeItem'];
-        }
+    if (($itemtype = PluginTagTag::getCurrentItemtype()) && PluginTagTag::canItemtype($itemtype)) {
+        $PLUGIN_HOOKS[Hooks::ITEM_ADD]['tag'][$itemtype]        = ['PluginTagTagItem', 'updateItem'];
+        $PLUGIN_HOOKS[Hooks::ITEM_UPDATE]['tag'][$itemtype]     = ['PluginTagTagItem', 'updateItem'];
+        $PLUGIN_HOOKS[Hooks::PRE_ITEM_UPDATE]['tag'][$itemtype]     = ['PluginTagTagItem', 'updateItem'];
+        $PLUGIN_HOOKS[Hooks::PRE_ITEM_PURGE]['tag'][$itemtype]  = ['PluginTagTagItem', 'purgeItem'];
     }
 
     // Always define hook for tickets
     // Needed for rules to function properly when a ticket is created from a mail
     // collector
-    $PLUGIN_HOOKS['item_add']['tag'][Ticket::getType()]        = ['PluginTagTagItem', 'updateItem'];
-    $PLUGIN_HOOKS['item_update']['tag'][Ticket::getType()]     = ['PluginTagTagItem', 'updateItem'];
-    $PLUGIN_HOOKS['pre_item_update']['tag'][Ticket::getType()]     = ['PluginTagTagItem', 'updateItem'];
-    $PLUGIN_HOOKS['pre_item_purge']['tag'][Ticket::getType()]  = ['PluginTagTagItem', 'purgeItem'];
+    $PLUGIN_HOOKS[Hooks::ITEM_ADD]['tag'][Ticket::getType()]        = ['PluginTagTagItem', 'updateItem'];
+    $PLUGIN_HOOKS[Hooks::ITEM_UPDATE]['tag'][Ticket::getType()]     = ['PluginTagTagItem', 'updateItem'];
+    $PLUGIN_HOOKS[Hooks::PRE_ITEM_UPDATE]['tag'][Ticket::getType()]     = ['PluginTagTagItem', 'updateItem'];
+    $PLUGIN_HOOKS[Hooks::PRE_ITEM_PURGE]['tag'][Ticket::getType()]  = ['PluginTagTagItem', 'purgeItem'];
+
+    // Always define hook for Form (GLPI 11 namespace class)
+    // Needed because getCurrentItemtype() doesn't handle namespaces correctly
+    $PLUGIN_HOOKS[Hooks::ITEM_ADD]['tag'][Form::class]        = ['PluginTagTagItem', 'updateItem'];
+    $PLUGIN_HOOKS[Hooks::ITEM_UPDATE]['tag'][Form::class]     = ['PluginTagTagItem', 'updateItem'];
+    $PLUGIN_HOOKS[Hooks::PRE_ITEM_UPDATE]['tag'][Form::class]     = ['PluginTagTagItem', 'updateItem'];
+    $PLUGIN_HOOKS[Hooks::PRE_ITEM_PURGE]['tag'][Form::class]  = ['PluginTagTagItem', 'purgeItem'];
 
     $PLUGIN_HOOKS['rule_matched']['tag'] = 'plugin_tag_rule_matched';
 }
@@ -294,7 +347,7 @@ function plugin_tag_rule_matched($params = [])
 {
     // Ensure tags are added when only actors are updated, as actor updates are processed in post_add
     if (
-        $params['sub_type'] == \RuleTicket::class
+        $params['sub_type'] == RuleTicket::class
         && !empty($params['output'])
         && isset($params['output']['id'])
         && (
@@ -314,18 +367,15 @@ function plugin_tag_getRuleActions($params = [])
 {
     $actions = [];
 
-    switch ($params['rule_itemtype']) {
-        case "RuleTicket":
-            $actions['_plugin_tag_tag_from_rules'] = [
-                'name'  => __("Add tags", 'tag'),
-                'type'  => 'dropdown',
-                'table' => PluginTagTag::getTable(),
-                'force_actions' => ['assign', 'append'],
-                'appendto' => '_additional_tags_from_rules',
-                'condition' => ['type_menu' => ['LIKE', '%\"Ticket\"%']],
-            ];
-
-            break;
+    if ($params['rule_itemtype'] === "RuleTicket") {
+        $actions['_plugin_tag_tag_from_rules'] = [
+            'name'  => __s("Add tags", 'tag'),
+            'type'  => 'dropdown',
+            'table' => PluginTagTag::getTable(),
+            'force_actions' => ['assign', 'append'],
+            'appendto' => '_additional_tags_from_rules',
+            'condition' => ['type_menu' => ['LIKE', '%\"Ticket\"%']],
+        ];
     }
 
     return $actions;
