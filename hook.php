@@ -178,17 +178,20 @@ function plugin_tag_giveItem($type, $field, $data, $num, $linkfield = "")
 
 function plugin_tag_addHaving($link, $nott, $itemtype, $id, $val, $num)
 {
+    /** @var DBmysql $DB */
+    global $DB;
+
     $searchopt = Search::getOptions($itemtype);
     $table     = $searchopt[$id]["table"];
     $field     = $searchopt[$id]["field"];
 
     if ($table . "." . $field === "glpi_plugin_tag_tags.type_menu") {
         $values = explode(",", (string) $val);
-        $where  = sprintf("%s `ITEM_%s` LIKE '%%", $link, $num) . $values[0] . "%'";
-        array_shift($values);
+        $first  = array_shift($values);
+        $where  = sprintf("%s `ITEM_%s` LIKE %s", $link, $num, $DB->quote('%' . $first . '%'));
         foreach ($values as $value) {
             $value = trim($value);
-            $where .= sprintf(" OR `ITEM_%s` LIKE '%%%s%%'", $num, $value);
+            $where .= sprintf(" OR `ITEM_%s` LIKE %s", $num, $DB->quote('%' . $value . '%'));
         }
 
         return $where;
@@ -199,6 +202,9 @@ function plugin_tag_addHaving($link, $nott, $itemtype, $id, $val, $num)
 
 function plugin_tag_addWhere($link, $nott, $itemtype, $id, $val, $searchtype)
 {
+    /** @var DBmysql $DB */
+    global $DB;
+
     $searchopt = Search::getOptions($itemtype);
     $table     = $searchopt[$id]["table"];
     $field     = $searchopt[$id]["field"];
@@ -206,10 +212,10 @@ function plugin_tag_addWhere($link, $nott, $itemtype, $id, $val, $searchtype)
     if ($table . "." . $field === "glpi_plugin_tag_tags.type_menu") {
         switch ($searchtype) {
             case 'equals':
-                return sprintf("`glpi_plugin_tag_tags`.`type_menu` LIKE '%%\"%s\"%%'", $val);
+                return sprintf("`glpi_plugin_tag_tags`.`type_menu` LIKE %s", $DB->quote('%"' . $val . '"%'));
 
             case 'notequals':
-                return sprintf("`glpi_plugin_tag_tags`.`type_menu` NOT LIKE '%%\"%s\"%%'", $val);
+                return sprintf("`glpi_plugin_tag_tags`.`type_menu` NOT LIKE %s", $DB->quote('%"' . $val . '"%'));
         }
     }
 
@@ -379,4 +385,29 @@ function plugin_tag_getRuleActions($params = [])
     }
 
     return $actions;
+}
+
+/**
+ * Display plugin-specific fields for the update massive action.
+ *
+ * @param array $params Massive action field parameters
+ *
+ */
+function plugin_tag_MassiveActionsFieldsDisplay(array $params): bool
+{
+    if (
+        ($params['itemtype'] ?? null) !== PluginTagTag::class
+        || ($params['options']['field'] ?? null) !== 'type_menu'
+    ) {
+        return false;
+    }
+
+    echo PluginTagTag::getSpecificValueToSelect(
+        'type_menu',
+        'type_menu',
+        ['type_menu' => []],
+        ['multiple' => true],
+    );
+
+    return true;
 }

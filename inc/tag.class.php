@@ -385,17 +385,29 @@ SQL;
         ]];
     }
 
-    public static function getSpecificValueToSelect($field, $name = '', $values = '', array $options = [])
-    {
+    public static function getSpecificValueToSelect(
+        $field,
+        $name = '',
+        $values = '',
+        array $options = [],
+    ) {
         /** @var array $CFG_GLPI */
         global $CFG_GLPI;
+
         if (!is_array($values)) {
             $values = [$field => $values];
         }
 
         if ($field === 'type_menu') {
-            $elements  = ['' => Dropdown::EMPTY_VALUE];
+            $multiple = (bool) ($options['multiple'] ?? false);
+
+            // Do not add an empty option to a multiple dropdown.
+            $elements = $multiple
+                ? []
+                : ['' => Dropdown::EMPTY_VALUE];
+
             $supported_itemtypes = $CFG_GLPI['plugin_tag_itemtypes'] ?? [];
+
             foreach ($supported_itemtypes as $itemtypes) {
                 foreach ($itemtypes as $itemtype) {
                     $item = getItemForItemtype($itemtype);
@@ -403,16 +415,47 @@ SQL;
                 }
             }
 
+            $selected = $values[$field] ?? ($multiple ? [] : '');
+
+            if ($multiple) {
+                if (!is_array($selected)) {
+                    $selected = $selected === ''
+                        ? []
+                        : [$selected];
+                }
+
+                return Dropdown::showFromArray(
+                    $name,
+                    $elements,
+                    [
+                        'display'  => false,
+                        'multiple' => true,
+                        'values'   => array_values($selected),
+                    ],
+                );
+            }
+
+            // Preserve the original single-select behavior.
+            if (is_array($selected)) {
+                $selected = reset($selected) ?: '';
+            }
+
             return Dropdown::showFromArray(
                 $name,
                 $elements,
-                ['display' => false,
-                    'value'   => $values[$field],
+                [
+                    'display' => false,
+                    'value'   => $selected,
                 ],
             );
         }
 
-        return parent::getSpecificValueToSelect($field, $name, $values, $options);
+        return parent::getSpecificValueToSelect(
+            $field,
+            $name,
+            $values,
+            $options,
+        );
     }
 
     public static function getSpecificValueToDisplay($field, $values, array $options = [])
@@ -433,7 +476,10 @@ SQL;
                 return implode(", ", $itemtype_names);
             case 'color':
                 $color = $values[$field] ?: '#DDDDDD';
-                return sprintf("<div style='background-color: %s;'>&nbsp;</div>", $color);
+                return sprintf(
+                    "<div style='background-color: %s;'>&nbsp;</div>",
+                    htmlspecialchars((string) $color, ENT_QUOTES, 'UTF-8'),
+                );
         }
 
         return parent::getSpecificValueToDisplay($field, $values, $options);
@@ -539,11 +585,11 @@ SQL;
 
             $content = "<div style='display: flex; flex-wrap: wrap;'>";
             foreach ($iterator as $data) {
-                $title = $data['comment'];
+                $title = htmlentities((string) $data['comment'], ENT_QUOTES, "UTF-8");
                 $name = $data['name'];
                 $color = $data['color'] ?: '#DDDDDD';
                 $textcolor = idealTextColor($color);
-                $style = sprintf('background-color: %s; color: %s;', $color, $textcolor);
+                $style = sprintf('background-color: %s; color: %s;', htmlentities((string) $color, ENT_QUOTES, "UTF-8"), $textcolor);
                 $content .= sprintf("<span class='tag_choice' style='%s' title='%s'>%s</span>&nbsp;&nbsp;", $style, $title, htmlentities((string) $name, ENT_QUOTES, "UTF-8"));
             }
 
@@ -747,12 +793,12 @@ SQL;
 
         return "<span class='select2-search-choice tag_choice'
                     style='padding-left:5px;{$style}'>"
-              . $separator . $plugintagtag->fields['name'] . '</span>';
+              . $separator . htmlentities((string) $plugintagtag->fields['name'], ENT_QUOTES, "UTF-8") . '</span>';
     }
 
     public function prepareInputForAdd($input)
     {
-        if (!$this->checkMandatoryFields($input)) {
+        if (!$this->checkMandatoryFields($input) || !$this->checkColorField($input)) {
             return false;
         }
 
@@ -761,11 +807,27 @@ SQL;
 
     public function prepareInputForUpdate($input)
     {
-        if (!$this->checkMandatoryFields($input)) {
+        if (!$this->checkMandatoryFields($input) || !$this->checkColorField($input)) {
             return false;
         }
 
         return $this->encodeSubtypes($input);
+    }
+
+    /**
+     * Check that the color field, if provided, is a valid hexadecimal color
+     *
+     * @param array $input
+     * @return boolean
+     */
+    public function checkColorField($input = [])
+    {
+        if (!empty($input['color']) && !preg_match('/^#[0-9A-Fa-f]{6}$/', (string) $input['color'])) {
+            Session::addMessageAfterRedirect(__s('Invalid color format', 'tag'), true, ERROR);
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -776,7 +838,13 @@ SQL;
     public function encodeSubtypes($input)
     {
         if (!empty($input['type_menu'])) {
-            $input['type_menu'] = json_encode(array_values($input['type_menu']));
+            $type_menu = $input['type_menu'];
+
+            if (!is_array($type_menu)) {
+                $type_menu = [$type_menu];
+            }
+
+            $input['type_menu'] = json_encode(array_values($type_menu));
         }
 
         return $input;

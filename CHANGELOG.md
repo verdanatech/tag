@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [UNRELEASED]
+## [2.14.6] - 2026-08-04
+
+### Fixed
+
+- Harden tag input handling and rendering across a few endpoints and templates
+- Fix massive update of associated item types when GLPI provides a scalar value
+- Allow selecting multiple associated item types in massive updates
 
 ## [2.14.5] - 2026-06-25
 
