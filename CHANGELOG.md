@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.14.7] - 2026-08-11
+
+### Fixed
+
+- Avoid a per-tag database lookup when rendering the tag column in item lists
+- Ignore submitted tags that are not visible in the user entities when saving an item
+
 ## [2.14.6] - 2026-08-04
 
 ### Fixed

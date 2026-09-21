@@ -22,6 +22,15 @@ class ComposerStaticInit0bb7734a8837cdd118f20d259d3613e7
 
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
+        'GlpiPlugin\\Tag\\Tests\\QuestionTypeTestCase' => __DIR__ . '/../..' . '/tests/QuestionTypeTestCase.php',
+        'GlpiPlugin\\Tag\\Tests\\TagTestCase' => __DIR__ . '/../..' . '/tests/TagTestCase.php',
+        'GlpiPlugin\\Tag\\Tests\\Units\\TagDestinationFieldTest' => __DIR__ . '/../..' . '/tests/Units/TagDestinationFieldTest.php',
+        'GlpiPlugin\\Tag\\Tests\\Units\\TagItemTest' => __DIR__ . '/../..' . '/tests/Units/TagItemTest.php',
+        'GlpiPlugin\\Tag\\Tests\\Units\\TagMassiveActionTest' => __DIR__ . '/../..' . '/tests/Units/TagMassiveActionTest.php',
+        'GlpiPlugin\\Tag\\Tests\\Units\\TagQuestionTypeMigrationTest' => __DIR__ . '/../..' . '/tests/Units/TagQuestionTypeMigrationTest.php',
+        'GlpiPlugin\\Tag\\Tests\\Units\\TagQuestionTypeTest' => __DIR__ . '/../..' . '/tests/Units/TagQuestionTypeTest.php',
+        'GlpiPlugin\\Tag\\Tests\\Units\\TagRuleTest' => __DIR__ . '/../..' . '/tests/Units/TagRuleTest.php',
+        'GlpiPlugin\\Tag\\Tests\\Units\\TagTest' => __DIR__ . '/../..' . '/tests/Units/TagTest.php',
     );
 
     public static function getInitializer(ClassLoader $loader)
